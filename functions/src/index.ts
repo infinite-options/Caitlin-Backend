@@ -8,7 +8,7 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
-export const loadGoalOrRoutine = functions.https.onRequest((request, response) => {
+export const AddGoalOrRoutine = functions.https.onRequest((request, response) => {
   const userId = request.get('userId')?.toString()
   const routineId = request.get('routineId')?.toString()
   const routineTitle = request.get('routineTitle')?.toString()
@@ -34,11 +34,11 @@ export const loadGoalOrRoutine = functions.https.onRequest((request, response) =
             'id':  routineId,
             'title':  routineTitle,
             'audio': '',
-            'available_end_time': '23:59:59',
-            'available_start_time': '00:00:00',
+            'available_end_time': availableEndTime,
+            'available_start_time': availableStartTime,
             'datetime_completed': '2020/02/03T08:32:42',
             'datetime_started': '2020/02/03T07:16:32',
-            'is_available': true,
+            'is_available': isAvailable,
             'is_complete': false,
             'is_persistent': is_persistent,
             'is_timed': true,
@@ -112,7 +112,7 @@ export const loadGoalOrRoutine = functions.https.onRequest((request, response) =
 //     response.redirect(303, "success");
 // });
 
-export const loadActionOrTask = functions.https.onRequest((request, response) => {
+export const AddActionOrTask = functions.https.onRequest((request, response) => {
   const userId = request.get('userId')?.toString()
   const routineId = request.get('routineId')?.toString()
   const taskId = request.get('taskId')?.toString()
@@ -136,11 +136,11 @@ export const loadActionOrTask = functions.https.onRequest((request, response) =>
             'id':  taskId,
             'title':  taskTitle,
             'audio': '',
-            'available_end_time': '23:59:59',
-            'available_start_time': '00:00:00',
+            'available_end_time': availableEndTime,
+            'available_start_time': availableStartTime,
             'datetime_completed': '2020/02/03T08:32:42',
             'datetime_started': '2020/02/03T07:16:32',
-            'is_available': true,
+            'is_available': isAvailable,
             'is_complete': false,
             'is_timed': true,
             'notes': notes,
@@ -170,7 +170,7 @@ export const loadActionOrTask = functions.https.onRequest((request, response) =>
     response.redirect(303, "success");
 });
 
-export const loadInstructionOrStep = functions.https.onRequest((request, response) => {
+export const AddInstructionOrStep = functions.https.onRequest((request, response) => {
   const userId = request.get('userId')?.toString()
   const routineId = request.get('routineId')?.toString()
   const taskId = request.get('taskId')?.toString()
@@ -198,11 +198,11 @@ export const loadInstructionOrStep = functions.https.onRequest((request, respons
           {
             'title':  stepTitle,
             'audio': '',
-            'available_end_time': '23:59:59',
-            'available_start_time': '00:00:00',
+            'available_end_time': availableEndTime,
+            'available_start_time': availableStartTime,
             'datetime_completed': '2020/02/03T08:32:42',
             'datetime_started': '2020/02/03T07:16:32',
-            'is_available': true,
+            'is_available': isAvailable,
             'is_complete': false,
             'is_timed': true,
             'notes': notes,
@@ -218,7 +218,7 @@ export const loadInstructionOrStep = functions.https.onRequest((request, respons
           if (instructionsAndSteps) {
             // check if the goals&routines array exists
             if(!instructionsAndSteps['instructions&steps']) {
-              instructionsAndSteps.push({'instructions&steps': []})
+              instructionsAndSteps['instructions&steps'] = []
             }
             instructionsAndSteps['instructions&steps'].push(item)
             taskDoc.set(instructionsAndSteps).then().catch()
@@ -250,15 +250,15 @@ export const CompleteTaskStep = functions.https.onRequest((request, response) =>
           console.log('No such document!');
         } else {
           stepNumber = parseInt(stepNumberReq)
-          let steps = doc.data();
-          if (steps && steps.steps[stepNumber]) {
-            steps.steps[stepNumber].is_complete = true;
+          const steps = doc.data();
+          if (steps && steps['instruction&steps']) {
+            steps['instruction&steps'].is_complete = true;
 
-            if (!steps.steps[stepNumber].datetime_completed) {
-              steps.steps[stepNumber].push('datetime_completed')
+            if (!steps['instruction&steps'][stepNumber].datetime_completed) {
+              steps['instruction&steps'][stepNumber].push('datetime_completed')
             }
 
-            steps.steps[stepNumber].datetime_completed = getCurrentDateTime()
+            steps['instruction&steps'][stepNumber].datetime_completed = getCurrentDateTime()
 
             task.set(steps).then().catch();
           }
@@ -272,6 +272,115 @@ export const CompleteTaskStep = functions.https.onRequest((request, response) =>
   response.redirect(303, "success");
 });
 
+export const AddCollectionAttribute = functions.https.onRequest((request, response) => {
+  // Grab the text parameter.
+  const collection = request.get('collection')?.toString()
+  const attribute = request.get('attribute')?.toString()
+  const valueReq = request.get('value')?.toString()
+  const value = valueReq ? parseValue(valueReq) : ""
+  const userId = request.get('userId')?.toString()
+  const routineId = request.get('routineId')?.toString()
+  const taskId = request.get('taskId')?.toString()
+
+  if (collection && attribute && value && userId && routineId && taskId) {
+    let docToAdd: FirebaseFirestore.DocumentReference
+    switch (collection) {
+      case 'goals&routines':
+        docToAdd = db.collection('users').doc(userId)
+        break;
+      case 'actions&tasks':
+        docToAdd = db.collection('users').doc(userId).collection('goals&routines').doc(routineId)
+        break;
+      case 'instructions&steps':
+        docToAdd = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks').doc(taskId)
+        break;
+      default:
+        docToAdd = db.collection('users').doc('wrongCollection')
+    }
+    docToAdd.get()
+      .then(doc => {
+        if (!doc.exists) {
+          console.log('No such document!');
+        } else {
+          const data = doc.data();
+
+          if (data && data[collection]) {
+            for (const element of data.get(collection)) {
+              element[attribute] = value
+            }
+            docToAdd.set(data).then().catch();
+          }
+        }
+        return routineId;
+      })
+      .catch(err => {
+        console.log('Error getting document', err);
+      });
+  }
+  response.redirect(303, "success");
+});
+
+export const SetUserGoogleAuthToken = functions.https.onRequest((request, response) => {
+  // Grab the text parameter.
+  const token = request.get('token')?.toString()
+  const userId = request.get('userId')?.toString()
+
+
+  if (token && userId) {
+
+    const userDoc = db.collection('users').doc(userId)
+    userDoc.get()
+      .then(doc => {
+        if (!doc.exists) {
+          console.log('No such document!');
+        } else {
+          const userFields = doc.data();
+
+          if (userFields) {
+            userFields['google_auth_token'] = token
+            userDoc.set(userFields).then().catch();
+          }
+        }
+        return userDoc;
+      })
+      .catch(err => {
+        console.log('Error getting document', err);
+      });
+  }
+  response.redirect(303, "success");
+});
+
+export const SetUserGoogleRefreshToken = functions.https.onRequest((request, response) => {
+  // Grab the text parameter.
+  const token = request.get('token')?.toString()
+  const userId = request.get('userId')?.toString()
+
+
+  if (token && userId) {
+
+    const userDoc = db.collection('users').doc(userId)
+    userDoc.get()
+      .then(doc => {
+        if (!doc.exists) {
+          console.log('No such document!');
+        } else {
+          const userFields = doc.data();
+
+          if (userFields) {
+            userFields['google_refresh_token'] = token
+            userDoc.set(userFields).then().catch();
+          }
+        }
+        return userDoc;
+      })
+      .catch(err => {
+        console.log('Error getting document', err);
+      });
+  }
+  response.redirect(303, "success");
+});
+
+
 function getCurrentDateTime() {
   const today = new Date()
 
@@ -283,4 +392,18 @@ function getCurrentDateTime() {
   const ss = String(today.getSeconds()).padStart(2, '0')
 
   return yyyy + '/' + mm + '/' + dd + 'T' + hh + ':' + mn + ':' + ss
+}
+
+function parseValue(value: string) {
+  switch (value.toLowerCase()) {
+    case 'true':
+      return true
+      break;
+    case 'false':
+      return false
+      break;
+    default:
+      return value
+      break;
+  }
 }
