@@ -233,6 +233,35 @@ export const AddInstructionOrStep = functions.https.onRequest((request, response
     response.redirect(303, "success");
 });
 
+export const StartTaskStep = functions.https.onRequest((request, response) => {
+  // Grab the text parameter.
+  const userId = request.get('userId')?.toString()
+  const routineId = request.get('routineId')?.toString()
+  const taskId = request.get('taskId')?.toString()
+  const stepNumberReq = request.get('stepNumber')?.toString()
+  let stepNumber: number
+
+  if (userId && routineId && taskId && stepNumberReq) {
+    const task = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks').doc(taskId);
+    task.get()
+      .then(doc => {
+        if (!doc.exists) {
+          console.log('No such document!');
+        } else {
+          stepNumber = parseInt(stepNumberReq)
+          const steps = doc.data()!;
+          steps['instructions&steps'][stepNumber].datetime_started = getCurrentDateTimeUTC()
+          task.set(steps).then().catch();
+        }
+        return routineId;
+      })
+      .catch(err => {
+        console.log('Error getting document', err);
+      });
+  }
+  response.redirect(303, "success");
+});
+
 export const CompleteTaskStep = functions.https.onRequest((request, response) => {
   // Grab the text parameter.
   const userId = request.get('userId')?.toString()
@@ -241,27 +270,21 @@ export const CompleteTaskStep = functions.https.onRequest((request, response) =>
   const stepNumberReq = request.get('stepNumber')?.toString()
   let stepNumber: number
 
-
   if (userId && routineId && taskId && stepNumberReq) {
-    const task = db.collection('users').doc(userId).collection('routines').doc(routineId).collection('tasks').doc(taskId);
+    const task = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks').doc(taskId);
     task.get()
       .then(doc => {
         if (!doc.exists) {
           console.log('No such document!');
         } else {
           stepNumber = parseInt(stepNumberReq)
-          const steps = doc.data();
-          if (steps && steps['instruction&steps']) {
-            steps['instruction&steps'].is_complete = true;
+          const steps = doc.data()!;
+          // console.log('Document data:', doc.data());
 
-            if (!steps['instruction&steps'][stepNumber].datetime_completed) {
-              steps['instruction&steps'][stepNumber].push('datetime_completed')
-            }
+          steps['instructions&steps'][stepNumber].is_complete = true;
+          steps['instructions&steps'][stepNumber].datetime_completed = getCurrentDateTimeUTC()
 
-            steps['instruction&steps'][stepNumber].datetime_completed = getCurrentDateTime()
-
-            task.set(steps).then().catch();
-          }
+          task.set(steps).then().catch();
         }
         return routineId;
       })
@@ -277,12 +300,11 @@ export const AddCollectionAttribute = functions.https.onRequest((request, respon
   const collection = request.get('collection')?.toString()
   const attribute = request.get('attribute')?.toString()
   const valueReq = request.get('value')?.toString()
-  const value = valueReq ? parseValue(valueReq) : ""
   const userId = request.get('userId')?.toString()
   const routineId = request.get('routineId')?.toString()
   const taskId = request.get('taskId')?.toString()
 
-  if (collection && attribute && value && userId && routineId && taskId) {
+  if (collection && attribute && valueReq && userId && routineId && taskId) {
     let docToAdd: FirebaseFirestore.DocumentReference
     switch (collection) {
       case 'goals&routines':
@@ -302,14 +324,14 @@ export const AddCollectionAttribute = functions.https.onRequest((request, respon
         if (!doc.exists) {
           console.log('No such document!');
         } else {
-          const data = doc.data();
+          const data = doc.data()!;
+          console.log('Document data:', doc.data());
 
-          if (data && data[collection]) {
-            for (const element of data.get(collection)) {
-              element[attribute] = value
-            }
-            docToAdd.set(data).then().catch();
+          for (let i: number = 0; i < data[collection].length; i++) {
+            data[collection][i][attribute] = parseValue(valueReq)
           }
+
+          docToAdd.set(data).then().catch();
         }
         return routineId;
       })
@@ -380,18 +402,9 @@ export const SetUserGoogleRefreshToken = functions.https.onRequest((request, res
   response.redirect(303, "success");
 });
 
-
-function getCurrentDateTime() {
+function getCurrentDateTimeUTC() {
   const today = new Date()
-
-  const dd = String(today.getDate()).padStart(2, '0')
-  const mm = String(today.getMonth() + 1).padStart(2, '0')
-  const yyyy = today.getFullYear()
-  const hh = String(today.getHours()).padStart(2, '0')
-  const mn = String(today.getMinutes()).padStart(2, '0')
-  const ss = String(today.getSeconds()).padStart(2, '0')
-
-  return yyyy + '/' + mm + '/' + dd + 'T' + hh + ':' + mn + ':' + ss
+  return today.toUTCString()
 }
 
 function parseValue(value: string) {
