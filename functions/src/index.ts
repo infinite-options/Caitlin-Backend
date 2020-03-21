@@ -1,6 +1,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 
+const firebase_tools = require('firebase-tools');
 const serviceAccount = require('../ServiceAccountKey.json');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -71,46 +72,6 @@ export const AddGoalOrRoutine = functions.https.onRequest((request, response) =>
     response.redirect(400, "Bad Request: Missing request headers.");
   }
 });
-
-// export const copyRoutineDoc = functions.https.onRequest((request, response) => {
-//   const userId = request.get('userId')?.toString()
-//   const routineId1 = request.get('routineId1')?.toString()
-//   const routineId2 = request.get('routineId2')?.toString()
-//
-//   var docData: { [id: string] : IPerson; } = {};
-//
-//   if (userId && routineId1 && routineId2) {
-//     const doc1 = db.collection('users').doc(userId).collection('routines').doc(routineId1)
-//     doc1.get()
-//       .then(doc => {
-//         if (!doc.exists) {
-//           console.log('No such document!');
-//         } else {
-//           docData = doc.data()
-//           console.log('docData: ' + docData)
-//         }
-//         return docData;
-//       })
-//       .catch(err => {
-//         console.log('Error getting document', err);
-//       });
-//
-//     const doc2 = db.collection('users').doc(userId).collection('goals&routines').doc(routineId2)
-//     doc2.get()
-//       .then(doc => {
-//         if (!doc.exists) {
-//           console.log('No such document!');
-//         } else {
-//           doc2.set(docData).then().catch()
-//         }
-//         return docData;
-//       })
-//       .catch(err => {
-//         console.log('Error getting document', err);
-//       });
-//     }
-//     response.redirect(303, "success");
-// });
 
 export const AddActionOrTask = functions.https.onRequest((request, response) => {
   const userId = request.get('userId')?.toString()
@@ -262,7 +223,7 @@ export const StartTaskStep = functions.https.onRequest((request, response) => {
   response.redirect(303, "success");
 });
 
-export const CompleteTaskStep = functions.https.onRequest((request, response) => {
+export const CompleteInstructionOrStep = functions.https.onRequest((request, response) => {
   // Grab the text parameter.
   const userId = request.get('userId')?.toString()
   const routineId = request.get('routineId')?.toString()
@@ -285,6 +246,128 @@ export const CompleteTaskStep = functions.https.onRequest((request, response) =>
           steps['instructions&steps'][stepNumber].datetime_completed = getCurrentDateTimeUTC()
 
           task.set(steps).then().catch();
+        }
+        return routineId;
+      })
+      .catch(err => {
+        console.log('Error getting document', err);
+      });
+  }
+  response.redirect(303, "success");
+});
+
+export const CompleteActionOrTask = functions.https.onRequest((request, response) => {
+  // Grab the text parameter.
+  const userId = request.get('userId')?.toString()
+  const routineId = request.get('routineId')?.toString()
+  const taskId = request.get('taskId')?.toString()
+  const taskNumberReq = request.get('taskNumber')?.toString()
+  let taskNumber: number
+
+  if (userId && routineId && taskId && taskNumberReq) {
+    const routine = db.collection('users').doc(userId).collection('goals&routines').doc(routineId)
+    routine.get()
+      .then(doc => {
+        if (!doc.exists) {
+          console.log('No such document!');
+        } else {
+          taskNumber = parseInt(taskNumberReq)
+          const tasks = doc.data()!;
+          // console.log('Document data:', doc.data());
+
+          if (tasks['actions&tasks'][taskNumber].id === taskId) {
+            tasks['actions&tasks'][taskNumber].is_complete = true;
+            tasks['actions&tasks'][taskNumber].datetime_completed = getCurrentDateTimeUTC()
+            routine.set(tasks).then().catch();
+          } else {
+            for (let i: number = 0; i < tasks['actions&tasks'].length; i++) {
+              if (tasks['actions&tasks'][i].id === taskId) {
+                tasks['actions&tasks'][i].is_complete = true;
+                tasks['actions&tasks'][i].datetime_completed = getCurrentDateTimeUTC()
+                routine.set(tasks).then().catch();
+              }
+            }
+          }
+        }
+        return taskId;
+      })
+      .catch(err => {
+        console.log('Error getting document', err);
+      });
+  }
+  response.redirect(303, "success");
+});
+
+export const CompleteGoalOrRoutine = functions.https.onRequest((request, response) => {
+  // Grab the text parameter.
+  const userId = request.get('userId')?.toString()
+  const routineId = request.get('routineId')?.toString()
+  const routineNumberReq = request.get('routineNumber')?.toString()
+  let routineNumber: number
+
+  if (userId && routineId && routineNumberReq) {
+    const user = db.collection('users').doc(userId)
+    user.get()
+      .then(doc => {
+        if (!doc.exists) {
+          console.log('No such document!');
+        } else {
+          routineNumber = parseInt(routineNumberReq)
+          const routines = doc.data()!;
+          // console.log('Document data:', doc.data());
+
+          if (routines['goals&routines'][routineNumber].id === routineId) {
+            routines['goals&routines'][routineNumber].is_complete = true;
+            routines['goals&routines'][routineNumber].datetime_completed = getCurrentDateTimeUTC()
+            user.set(routines).then().catch();
+          } else {
+            for (let i: number = 0; i < routines['goals&routines'].length; i++) {
+              if (routines['goals&routines'][i].id === routineId) {
+                routines['goals&routines'][i].is_complete = true;
+                routines['goals&routines'][i].datetime_completed = getCurrentDateTimeUTC()
+                user.set(routines).then().catch();
+              }
+            }
+          }
+        }
+        return routineId;
+      })
+      .catch(err => {
+        console.log('Error getting document', err);
+      });
+  }
+  response.redirect(303, "success");
+});
+
+export const GRUserNotificationSetToTrue = functions.https.onRequest((request, response) => {
+  // Grab the text parameter.
+  const userId = request.get('userId')?.toString()
+  const routineId = request.get('routineId')?.toString()
+  const routineNumberReq = request.get('routineNumber')?.toString()
+  let routineNumber: number
+
+  if (userId && routineId && routineNumberReq) {
+    const user = db.collection('users').doc(userId)
+    user.get()
+      .then(doc => {
+        if (!doc.exists) {
+          console.log('No such document!');
+        } else {
+          routineNumber = parseInt(routineNumberReq)
+          const routines = doc.data()!;
+          // console.log('Document data:', doc.data());
+
+          if (routines['goals&routines'][routineNumber].id === routineId) {
+            routines['goals&routines'][routineNumber].user_notification_set = true;
+            user.set(routines).then().catch();
+          } else {
+            for (let i: number = 0; i < routines['goals&routines'].length; i++) {
+              if (routines['goals&routines'][i].id === routineId) {
+                routines['goals&routines'][i].user_notification_set = true;
+                user.set(routines).then().catch();
+              }
+            }
+          }
         }
         return routineId;
       })
@@ -339,6 +422,74 @@ export const AddCollectionAttribute = functions.https.onRequest((request, respon
         console.log('Error getting document', err);
       });
   }
+  response.redirect(303, "success");
+});
+
+export const CopyDocDataToChild = functions.https.onRequest((request, response) => {
+  // Grab the text parameter.
+  const collection = request.get('collection')?.toString()
+  const userId = request.get('userId')?.toString()
+  const routineId = request.get('routineId')?.toString()
+  const taskId = request.get('taskId')?.toString()
+
+  let docCopyData: FirebaseFirestore.DocumentData
+
+  let docToCopy: FirebaseFirestore.DocumentReference
+  let copyToDoc: FirebaseFirestore.DocumentReference
+
+  if (collection && userId && routineId && taskId) {
+    switch (collection) {
+      case 'goals&routines':
+        docToCopy = db.collection('users').doc(userId)
+        copyToDoc = db.collection('users').doc(userId).collection('goals&routines').doc(routineId)
+        break;
+      case 'actions&tasks':
+        docToCopy = db.collection('users').doc(userId).collection('goals&routines').doc(routineId)
+        copyToDoc = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks').doc(taskId)
+        break;
+      case 'instructions&steps':
+        docToCopy = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks').doc(taskId)
+        copyToDoc= db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks').doc(taskId).collection('instructions&steps').doc(taskId)
+        break;
+      default:
+        docToCopy = db.collection('users').doc('wrongCollection')
+        copyToDoc = db.collection('users').doc('wrongCollection')
+
+    }
+
+    docToCopy.get()
+      .then(doc => {
+        if (!doc.exists) {
+          console.log('No such document!');
+        } else {
+          docCopyData = doc.data()![collection];
+          console.log('Document data:', doc.data())
+        }
+        return routineId;
+      })
+      .catch(err => {
+        console.log('Error getting document', err);
+      });
+
+    copyToDoc.get()
+      .then(doc => {
+        if (!doc.exists) {
+          console.log('No such document!');
+        } else {
+          const currentData = doc.data()!;
+          console.log('Document data:', doc.data());
+
+          currentData.push(docCopyData)
+
+          copyToDoc.set(currentData).then().catch();
+        }
+        return routineId;
+      })
+      .catch(err => {
+        console.log('Error getting document', err);
+      });
+    }
+
   response.redirect(303, "success");
 });
 
@@ -401,6 +552,54 @@ export const SetUserGoogleRefreshToken = functions.https.onRequest((request, res
   }
   response.redirect(303, "success");
 });
+
+/**
+ * Initiate a recursive delete of documents at a given path.
+ *
+ * The calling user must be authenticated and have the custom "admin" attribute
+ * set to true on the auth token.
+ *
+ * This delete is NOT an atomic operation and it's possible
+ * that it may fail after only deleting some documents.
+ *
+ * @param {string} data.path the document or collection path to delete.
+ */
+exports.RecursiveDelete = functions
+  .runWith({
+    timeoutSeconds: 540,
+    memory: '2GB'
+  })
+  .https.onCall((data, context) => {
+    // Only allow admin users to execute this function.
+    if (!(context.auth && context.auth.token && context.auth.token.admin)) {
+      throw new functions.https.HttpsError(
+        'permission-denied',
+        'Must be an administrative user to initiate delete.'
+      );
+    }
+
+    const path = data.path;
+    console.log(
+      `User ${context.auth.uid} has requested to delete path ${path}`
+    );
+
+    // Run a recursive delete on the given document or collection path.
+    // The 'token' must be set in the functions config, and can be generated
+    // at the command line by running 'firebase login:ci'.
+    return firebase_tools.firestore
+      .delete(path, {
+        project: process.env.GCLOUD_PROJECT,
+        recursive: true,
+        yes: true,
+        token: functions.config().fb.token
+      })
+      .then(() => {
+        return {
+          path: path
+        };
+      });
+  });
+
 
 function getCurrentDateTimeUTC() {
   const today = new Date()
