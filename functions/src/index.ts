@@ -2,12 +2,14 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 
 const firebase_tools = require('firebase-tools');
-const serviceAccount = require('../ServiceAccountKey.json');
+const serviceAccount = require('../project-caitlin-c71a9-firebase-adminsdk-kua2i-7ba122dd0f.json');
+// const serviceAccount = "Something";
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
 const db = admin.firestore();
+// const routineDoc = db.collection('users').doc("7R6hAVmDrNutRkG3sVRy").collection('goals&routines').doc("Fv9p4KO8XdYR5OtIy5Kz")
 
 export const AddGoalOrRoutine = functions.https.onRequest((request, response) => {
   const userId = request.get('userId')?.toString()
@@ -605,6 +607,7 @@ function getCurrentDateTimeUTC() {
   const today = new Date()
   return today.toUTCString()
 }
+
 
 function parseValue(value: string) {
   switch (value.toLowerCase()) {
