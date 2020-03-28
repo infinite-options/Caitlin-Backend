@@ -382,44 +382,40 @@ export const AddCollectionAttribute = functions.https.onRequest((request, respon
   // Grab the text parameter.
   const collection = request.get('collection')?.toString()
   const attribute = request.get('attribute')?.toString()
+  const valueType = request.get('valueType')?.toString()
   const valueReq = request.get('value')?.toString()
   const userId = request.get('userId')?.toString()
   const routineId = request.get('routineId')?.toString()
-  const taskId = request.get('taskId')?.toString()
 
-  if (collection && attribute && valueReq && userId && routineId && taskId) {
-    let docToAdd: FirebaseFirestore.DocumentReference
+  if (collection && attribute && valueType && valueReq && userId && routineId) {
+    let docsToAdd: FirebaseFirestore.CollectionReference<FirebaseFirestore.DocumentData>
     switch (collection) {
       case 'goals&routines':
-        docToAdd = db.collection('users').doc(userId)
+        docsToAdd = db.collection('users')
         break;
       case 'actions&tasks':
-        docToAdd = db.collection('users').doc(userId).collection('goals&routines').doc(routineId)
+        docsToAdd = db.collection('users').doc(userId).collection('goals&routines')
         break;
       case 'instructions&steps':
-        docToAdd = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks').doc(taskId)
+        docsToAdd = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks')
         break;
       default:
-        docToAdd = db.collection('users').doc('wrongCollection')
+        docsToAdd = db.collection('wrongCollection')
     }
-    docToAdd.get()
-      .then(doc => {
-        if (!doc.exists) {
-          console.log('No such document!');
-        } else {
-          const data = doc.data()!;
-          console.log('Document data:', doc.data());
 
-          for (let i: number = 0; i < data[collection].length; i++) {
-            data[collection][i][attribute] = parseValue(valueReq)
-          }
+    docsToAdd.get()
+      .then(snapshot => {
+        snapshot.forEach(doc => {
 
-          docToAdd.set(data).then().catch();
-        }
-        return routineId;
+            for (let i: number = 0; i < doc.data()[collection].length; i++) {
+              doc.data()[collection][i][attribute] = parseValue(valueReq, valueReq)
+            }
+            console.log('doc.ref.path: ' + doc.ref.path)
+            db.doc(doc.ref.path).set(doc.data()).then().catch();
+        });
       })
       .catch(err => {
-        console.log('Error getting document', err);
+        console.log('Error getting documents', err);
       });
   }
   response.redirect(303, "success");
@@ -606,16 +602,28 @@ function getCurrentDateTimeUTC() {
   return today.toUTCString()
 }
 
-function parseValue(value: string) {
-  switch (value.toLowerCase()) {
-    case 'true':
-      return true
-      break;
-    case 'false':
-      return false
-      break;
-    default:
-      return value
-      break;
-  }
+function parseValue(value: string, valueType: string) {
+    switch (valueType) {
+        case 'boolean':
+            switch (value.toLowerCase()) {
+              case 'true':
+                return true
+                break;
+              case 'false':
+                return false
+                break;
+              default:
+                return false
+                break;
+            }
+            break;
+
+        case 'integer':
+            return +value
+            break;
+
+        default:
+            return value
+            break;
+    }
 }
