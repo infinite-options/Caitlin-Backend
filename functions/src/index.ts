@@ -379,13 +379,12 @@ export const GRUserNotificationSetToTrue = functions.https.onRequest((request, r
 });
 
 export const AddCollectionAttribute = functions.https.onRequest((request, response) => {
-  // Grab the text parameter.
-  const collection = request.get('collection')?.toString()
+  const collection = request.get('collection')?.toString() // determines intial level of GRATIS
   const attribute = request.get('attribute')?.toString()
   const valueReq = request.get('value')?.toString()
-  const userId = request.get('userId')?.toString()
-  const routineId = request.get('routineId')?.toString()
-  const taskId = request.get('taskId')?.toString()
+  const userId = request.get('userId')?.toString() // find the Goal or Routine associated with the User
+  const routineId = request.get('routineId')?.toString() // find the Actions or Tasks associated with the Goal or Routine
+  const taskId = request.get('taskId')?.toString() // find the Instructions or Steps associated with the Actions or Tasks
 
   if (collection && attribute && valueReq && userId && routineId && taskId) {
     let docToAdd: FirebaseFirestore.DocumentReference
