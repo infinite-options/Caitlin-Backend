@@ -383,37 +383,17 @@ export const AddNotificationField = functions.https.onRequest(async (request, re
     let atCollections: string[] = []
     let isCollections: string[] = []
 
-    const notificationData = {
-        'before': {
-            'time': 0,
-            'message': '',
-            'is_enabled': false
-        },
-        'during': {
-            'time': 0,
-            'message': '',
-            'is_enabled': false
-        },
-        'after': {
-            'time': 0,
-            'message': '',
-            'is_enabled': false
-        }
-    }
-
     await db.collection('users').get()
     .then(snapshot => {
         snapshot.forEach(doc => {
             const data = doc.data()
-            for (let i: number = 0; i < data['goals&routines'].length; i++) {
-                data['goals&routines'][i]['ta_notifications'] = notificationData
-                data['goals&routines'][i]['user_notifications'] = notificationData
-                delete data['goals&routines'][i]['ta_notification_reasons']
-                delete data['goals&routines'][i]['remind_types']
-                delete data['goals&routines'][i]['reminds_user']
-                delete data['goals&routines'][i]['notifies_ta']
+            for (const grItem of data['goals&routines']) {
+                setNotificationData(grItem['ta_notifications'])
+                setNotificationData(grItem['user_notifications'])
                 atCollections.push(doc.ref.path + '/goals&routines')
+                deleteFields(grItem)
             }
+
             db.doc(doc.ref.path).set(data).then().catch();
         });
     })
@@ -426,14 +406,11 @@ export const AddNotificationField = functions.https.onRequest(async (request, re
             .then(snapshot => {
                 snapshot.forEach(doc => {
                     const data = doc.data()
-                    for (let i: number = 0; i < data['actions&tasks'].length; i++) {
-                        data['actions&tasks'][i]['ta_notifications'] = notificationData
-                        data['actions&tasks'][i]['user_notifications'] = notificationData
-                        delete data['actions&tasks'][i]['ta_notification_reasons']
-                        delete data['actions&tasks'][i]['remind_types']
-                        delete data['actions&tasks'][i]['reminds_user']
-                        delete data['actions&tasks'][i]['notifies_ta']
-                        isCollections.push(doc.ref.path + '/actions&tasks')
+                    for (const grItem of data['actions&tasks']) {
+                        setNotificationData(grItem['ta_notifications'])
+                        setNotificationData(grItem['user_notifications'])
+                        atCollections.push(doc.ref.path + '/actions&tasks')
+                        deleteFields(grItem)
                     }
                     db.doc(doc.ref.path).set(data).then().catch();
                 });
@@ -448,13 +425,11 @@ export const AddNotificationField = functions.https.onRequest(async (request, re
             .then(snapshot => {
                 snapshot.forEach(doc => {
                     const data = doc.data()
-                    for (let i: number = 0; i < data['instructions&steps'].length; i++) {
-                        data['instructions&steps'][i]['ta_notifications'] = notificationData
-                        data['instructions&steps'][i]['user_notifications'] = notificationData
-                        delete data['instructions&steps'][i]['ta_notification_reasons']
-                        delete data['instructions&steps'][i]['remind_types']
-                        delete data['instructions&steps'][i]['reminds_user']
-                        delete data['instructions&steps'][i]['notifies_ta']
+                    for (const grItem of data['instructions&steps']) {
+                        setNotificationData(grItem['ta_notifications'])
+                        setNotificationData(grItem['user_notifications'])
+                        atCollections.push(doc.ref.path + '/instructions&steps')
+                        deleteFields(grItem)
                     }
                     db.doc(doc.ref.path).set(data).then().catch();
                 });
@@ -468,27 +443,27 @@ export const AddNotificationField = functions.https.onRequest(async (request, re
 
 export const AddCollectionField = functions.https.onRequest((request, response) => {
     // Grab the text parameter.
-    const collection = request.get('collection')?.toString()
-    const field = request.get('field')?.toString()
-    const valueType = request.get('valueType')?.toString()
-    const valueReq = request.get('value')?.toString()
-    const userId = request.get('userId')?.toString()
-    const routineId = request.get('routineId')?.toString()
+    const collection = request.get('collection')?.toString() // 'goals&routines'
+    const field = request.get('field')?.toString() // 'expected_time'
+    const valueType = request.get('valueType')?.toString() // string
+    const valueReq = request.get('value')?.toString() // '00:10:00'
+    const userId = request.get('userId')?.toString() // '7R6hAVmDrNutRkG3sVRy'
+    const routineId = request.get('routineId')?.toString() // 'LALObb6XDRk5wr2E8w2C'
 
     if (collection && field && valueType && valueReq && userId && routineId) {
         let docsToAdd: FirebaseFirestore.CollectionReference<FirebaseFirestore.DocumentData>
         switch (collection) {
             case 'goals&routines':
-            docsToAdd = db.collection('users')
-            break;
+                docsToAdd = db.collection('users')
+                break;
             case 'actions&tasks':
-            docsToAdd = db.collection('users').doc(userId).collection('goals&routines')
-            break;
+                docsToAdd = db.collection('users').doc(userId).collection('goals&routines')
+                break;
             case 'instructions&steps':
-            docsToAdd = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks')
-            break;
+                docsToAdd = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks')
+                break;
             default:
-            docsToAdd = db.collection('wrongCollection')
+                docsToAdd = db.collection('wrongCollection')
         }
 
         docsToAdd.get()
@@ -716,4 +691,33 @@ function parseValue(value: string, valueType: string): any {
             return value
             break;
     }
+}
+
+function setNotificationData(notificationData:any) {
+    for (const time of ['before', 'during', 'after']) {
+        if (!('time' in notificationData)) {
+            notificationData[time]['time'] = '00:10:00'
+        }
+        if (!('message' in notificationData)) {
+            notificationData[time]['message'] = ''
+        }
+        if (!('is_enabled' in notificationData)) {
+            notificationData[time]['is_enabled'] = false
+        }
+        if (!('is_set' in notificationData)) {
+            notificationData[time]['is_set'] = false
+        }
+    }
+    delete notificationData['is_set']
+    delete notificationData['message']
+    delete notificationData['is_enabled']
+    delete notificationData['time']
+}
+
+function deleteFields(data:any) {
+    delete data['user_notification_set']
+    delete data['ta_notification_reasons']
+    delete data['remind_types']
+    delete data['reminds_user']
+    delete data['notifies_ta']
 }
