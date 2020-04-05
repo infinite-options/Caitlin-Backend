@@ -380,8 +380,8 @@ export const GRUserNotificationSetToTrue = functions.https.onRequest((request, r
 
 export const AddNotificationField = functions.https.onRequest(async (request, response) => {
 
-    let atCollections: string[] = []
-    let isCollections: string[] = []
+    const atCollections: string[] = []
+    const isCollections: string[] = []
 
     await db.collection('users').get()
     .then(snapshot => {
@@ -441,7 +441,7 @@ export const AddNotificationField = functions.https.onRequest(async (request, re
     response.redirect(303, "success");
 });
 
-export const AddCollectionField = functions.https.onRequest((request, response) => {
+export const AddCollectionField = functions.https.onRequest(async (request, response) => {
     // Grab the text parameter.
     const collection = request.get('collection')?.toString() // 'goals&routines'
     const field = request.get('field')?.toString() // 'expected_time'
@@ -449,33 +449,29 @@ export const AddCollectionField = functions.https.onRequest((request, response) 
     const valueReq = request.get('value')?.toString() // '00:10:00'
 
     if (collection && field && valueType && valueReq) {
-        let grCollections: string[] = []
-        let atCollections: string[] = []
-        let isCollections: string[] = []
-
-        grCollections.push('users')
-
-        const gratisCollections: string[][] = [grCollections, atCollections, isCollections]
+        let gratisPaths: string[] = []
         const gratisStrings: string[] = ['goals&routines', 'actions&tasks', 'instructions&steps']
+        let isFieldUpdated = false
 
-        for (let i = 0; i < gratisCollections.length; i++) {
-            for (const gratisDocs of gratisCollections[i]) {
-                db.collection(gratisDocs).get()
+        gratisPaths.push('users')
+
+        for (let i = 0; i < gratisStrings.length; i++) {
+            console.log('gratisPaths: ' + gratisPaths)
+            const nextCollections: string[] = []
+            for (const gratisPath of gratisPaths) {
+                await db.collection(gratisPath).get()
                     .then(snapshot => {
                         snapshot.forEach(doc => {
                             const data = doc.data()
                             const isSpecifiedCollection = gratisStrings[i] === collection
-
-                            for (const gratisData of data[gratisStrings[i]]) {
-                                if (isSpecifiedCollection) {
-                                    gratisData[field] = parseValue(valueReq, valueType)
-                                }
-                                gratisCollections[(i + 1) % 3].push(doc.ref.path + '/' + gratisStrings[i])
-                            }
+                            nextCollections.push(doc.ref.path + '/' + gratisStrings[i])
 
                             if (isSpecifiedCollection) {
+                                for (const gratisData of data[gratisStrings[i]]) {
+                                    gratisData[field] = parseValue(valueReq, valueType)
+                                }
                                 db.doc(doc.ref.path).set(data).then().catch();
-                                return
+                                isFieldUpdated = true
                             }
                         });
                     })
@@ -483,6 +479,10 @@ export const AddCollectionField = functions.https.onRequest((request, response) 
                         console.log('Error getting documents', err);
                     });
             }
+            if (isFieldUpdated) {
+                break;
+            }
+            gratisPaths = nextCollections
         }
         response.redirect(303, "success");
     } else {
@@ -509,8 +509,8 @@ export const AddDatabaseField = functions.https.onRequest((request, response) =>
         let gratisIdx = 0;
 
         for (const gratisCollection of gratisCollections) {
-            for (const gratisDocs of gratisCollection) {
-                db.collection(gratisDocs).get()
+            for (const gratisPath of gratisCollection) {
+                db.collection(gratisPath).get()
                     .then(snapshot => {
                         snapshot.forEach(doc => {
                             const data = doc.data()
