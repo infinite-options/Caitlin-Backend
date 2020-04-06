@@ -380,8 +380,8 @@ export const GRUserNotificationSetToTrue = functions.https.onRequest((request, r
 
 export const AddNotificationField = functions.https.onRequest(async (request, response) => {
 
-    let atCollections: string[] = []
-    let isCollections: string[] = []
+    const atCollections: string[] = []
+    const isCollections: string[] = []
 
     await db.collection('users').get()
     .then(snapshot => {
@@ -441,45 +441,92 @@ export const AddNotificationField = functions.https.onRequest(async (request, re
     response.redirect(303, "success");
 });
 
-export const AddCollectionField = functions.https.onRequest((request, response) => {
+export const AddCollectionField = functions.https.onRequest(async (request, response) => {
     // Grab the text parameter.
     const collection = request.get('collection')?.toString() // 'goals&routines'
     const field = request.get('field')?.toString() // 'expected_time'
     const valueType = request.get('valueType')?.toString() // string
     const valueReq = request.get('value')?.toString() // '00:10:00'
-    const userId = request.get('userId')?.toString() // '7R6hAVmDrNutRkG3sVRy'
-    const routineId = request.get('routineId')?.toString() // 'LALObb6XDRk5wr2E8w2C'
 
-    if (collection && field && valueType && valueReq && userId && routineId) {
-        let docsToAdd: FirebaseFirestore.CollectionReference<FirebaseFirestore.DocumentData>
-        switch (collection) {
-            case 'goals&routines':
-                docsToAdd = db.collection('users')
+    if (collection && field && valueType && valueReq) {
+        let gratisPaths: string[] = []
+        const gratisStrings: string[] = ['goals&routines', 'actions&tasks', 'instructions&steps']
+        let isFieldUpdated = false
+
+        gratisPaths.push('users')
+
+        for (let i = 0; i < gratisStrings.length; i++) {
+            console.log('gratisPaths: ' + gratisPaths)
+            const nextCollections: string[] = []
+            for (const gratisPath of gratisPaths) {
+                await db.collection(gratisPath).get()
+                    .then(snapshot => {
+                        snapshot.forEach(doc => {
+                            const data = doc.data()
+                            const isSpecifiedCollection = gratisStrings[i] === collection
+                            nextCollections.push(doc.ref.path + '/' + gratisStrings[i])
+
+                            if (isSpecifiedCollection) {
+                                for (const gratisData of data[gratisStrings[i]]) {
+                                    gratisData[field] = parseValue(valueReq, valueType)
+                                }
+                                db.doc(doc.ref.path).set(data).then().catch();
+                                isFieldUpdated = true
+                            }
+                        });
+                    })
+                    .catch(err => {
+                        console.log('Error getting documents', err);
+                    });
+            }
+            if (isFieldUpdated) {
                 break;
-            case 'actions&tasks':
-                docsToAdd = db.collection('users').doc(userId).collection('goals&routines')
-                break;
-            case 'instructions&steps':
-                docsToAdd = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks')
-                break;
-            default:
-                docsToAdd = db.collection('wrongCollection')
+            }
+            gratisPaths = nextCollections
         }
+        response.redirect(303, "success");
+    } else {
+        response.redirect(500, "Internal Server Error");
+    }
+});
 
-        docsToAdd.get()
-        .then(snapshot => {
-            snapshot.forEach(doc => {
-                const data = doc.data()
-                for (let i: number = 0; i < data[collection].length; i++) {
-                    data[collection][i][field] = parseValue(valueReq, valueType)
-                }
-                console.log('document data: ', data)
-                db.doc(doc.ref.path).set(data).then().catch();
-            });
-        })
-        .catch(err => {
-            console.log('Error getting documents', err);
-        });
+export const AddDatabaseField = functions.https.onRequest((request, response) => {
+    // Grab the text parameter.
+    const field = request.get('field')?.toString() // 'expected_time'
+    const valueType = request.get('valueType')?.toString() // string
+    const valueReq = request.get('value')?.toString() // '00:10:00'
+
+    if (field && valueType && valueReq) {
+
+        let grCollections: string[] = []
+        let atCollections: string[] = []
+        let isCollections: string[] = []
+
+        grCollections.push('users')
+
+        const gratisCollections: string[][] = [grCollections, atCollections, isCollections]
+        const gratisStrings = ['goals&routines', 'actions&tasks', 'instructions&steps']
+        let gratisIdx = 0;
+
+        for (const gratisCollection of gratisCollections) {
+            for (const gratisPath of gratisCollection) {
+                db.collection(gratisPath).get()
+                    .then(snapshot => {
+                        snapshot.forEach(doc => {
+                            const data = doc.data()
+                            for (const gratisData of data[gratisStrings[gratisIdx]]) {
+                                gratisData[field] = parseValue(valueReq, valueType)
+                                gratisCollections[(gratisIdx + 1) % 3].push(doc.ref.path + '/' + gratisStrings[gratisIdx])
+                            }
+                            db.doc(doc.ref.path).set(data).then().catch();
+                        });
+                    })
+                    .catch(err => {
+                        console.log('Error getting documents', err);
+                    });
+            }
+            gratisIdx += 1
+        }
         response.redirect(303, "success");
     } else {
         response.redirect(500, "Internal Server Error");
