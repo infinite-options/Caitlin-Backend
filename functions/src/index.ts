@@ -387,14 +387,22 @@ export const AddNotificationField = functions.https.onRequest(async (request, re
     .then(snapshot => {
         snapshot.forEach(doc => {
             const data = doc.data()
-            for (const grItem of data['goals&routines']) {
-                setNotificationData(grItem['ta_notifications'])
-                setNotificationData(grItem['user_notifications'])
-                atCollections.push(doc.ref.path + '/goals&routines')
-                deleteFields(grItem)
-            }
+            if (Array.isArray(data['goals&routines']) && data['goals&routines'].length) {
+                for (const grItem of data['goals&routines']) {
+                    atCollections.push(doc.ref.path + '/goals&routines')
+                    if (!('ta_notifications' in grItem)) {
+                        grItem['ta_notifications'] = {}
+                    }
+                    if (!('user_notifications' in grItem)) {
+                        grItem['user_notifications'] = {}
+                    }
+                    setNotificationData(grItem['ta_notifications'])
+                    setNotificationData(grItem['user_notifications'])
+                    deleteFields(grItem)
+                }
 
-            db.doc(doc.ref.path).set(data).then().catch();
+                db.doc(doc.ref.path).set(data).then().catch();
+            }
         });
     })
     .catch(err => {
@@ -402,17 +410,25 @@ export const AddNotificationField = functions.https.onRequest(async (request, re
     });
 
     for (const collection of atCollections) {
-        db.collection(collection).get()
+        await db.collection(collection).get()
             .then(snapshot => {
                 snapshot.forEach(doc => {
                     const data = doc.data()
-                    for (const grItem of data['actions&tasks']) {
-                        setNotificationData(grItem['ta_notifications'])
-                        setNotificationData(grItem['user_notifications'])
-                        atCollections.push(doc.ref.path + '/actions&tasks')
-                        deleteFields(grItem)
+                    if (Array.isArray(data['actions&tasks']) && data['actions&tasks'].length) {
+                        for (const atItem of data['actions&tasks']) {
+                            atCollections.push(doc.ref.path + '/actions&tasks')
+                            if (!('ta_notifications' in atItem)) {
+                                atItem['ta_notifications'] = {}
+                            }
+                            if (!('user_notifications' in atItem)) {
+                                atItem['user_notifications'] = {}
+                            }
+                            setNotificationData(atItem['ta_notifications'])
+                            setNotificationData(atItem['user_notifications'])
+                            deleteFields(atItem)
+                        }
+                        db.doc(doc.ref.path).set(data).then().catch();
                     }
-                    db.doc(doc.ref.path).set(data).then().catch();
                 });
             })
             .catch(err => {
@@ -425,13 +441,20 @@ export const AddNotificationField = functions.https.onRequest(async (request, re
             .then(snapshot => {
                 snapshot.forEach(doc => {
                     const data = doc.data()
-                    for (const grItem of data['instructions&steps']) {
-                        setNotificationData(grItem['ta_notifications'])
-                        setNotificationData(grItem['user_notifications'])
-                        atCollections.push(doc.ref.path + '/instructions&steps')
-                        deleteFields(grItem)
+                    if (Array.isArray(data['instructions&steps']) && data['instructions&steps'].length) {
+                        for (const isItem of data['instructions&steps']) {
+                            if (!('ta_notifications' in isItem)) {
+                                isItem['ta_notifications'] = {}
+                            }
+                            if (!('user_notifications' in isItem)) {
+                                isItem['user_notifications'] = {}
+                            }
+                            setNotificationData(isItem['ta_notifications'])
+                            setNotificationData(isItem['user_notifications'])
+                            deleteFields(isItem)
+                        }
+                        db.doc(doc.ref.path).set(data).then().catch();
                     }
-                    db.doc(doc.ref.path).set(data).then().catch();
                 });
             })
             .catch(err => {
@@ -490,33 +513,30 @@ export const AddCollectionField = functions.https.onRequest(async (request, resp
     }
 });
 
-export const AddDatabaseField = functions.https.onRequest((request, response) => {
+export const AddDatabaseField = functions.https.onRequest(async (request, response) => {
     // Grab the text parameter.
     const field = request.get('field')?.toString() // 'expected_time'
     const valueType = request.get('valueType')?.toString() // string
     const valueReq = request.get('value')?.toString() // '00:10:00'
 
     if (field && valueType && valueReq) {
+        let gratisPaths: string[] = []
+        const gratisStrings: string[] = ['goals&routines', 'actions&tasks', 'instructions&steps']
 
-        let grCollections: string[] = []
-        let atCollections: string[] = []
-        let isCollections: string[] = []
+        gratisPaths.push('users')
 
-        grCollections.push('users')
-
-        const gratisCollections: string[][] = [grCollections, atCollections, isCollections]
-        const gratisStrings = ['goals&routines', 'actions&tasks', 'instructions&steps']
-        let gratisIdx = 0;
-
-        for (const gratisCollection of gratisCollections) {
-            for (const gratisPath of gratisCollection) {
-                db.collection(gratisPath).get()
+        for (let i = 0; i < gratisStrings.length; i++) {
+            console.log('gratisPaths: ' + gratisPaths)
+            const nextCollections: string[] = []
+            for (const gratisPath of gratisPaths) {
+                await db.collection(gratisPath).get()
                     .then(snapshot => {
                         snapshot.forEach(doc => {
                             const data = doc.data()
-                            for (const gratisData of data[gratisStrings[gratisIdx]]) {
+                            nextCollections.push(doc.ref.path + '/' + gratisStrings[i])
+
+                            for (const gratisData of data[gratisStrings[i]]) {
                                 gratisData[field] = parseValue(valueReq, valueType)
-                                gratisCollections[(gratisIdx + 1) % 3].push(doc.ref.path + '/' + gratisStrings[gratisIdx])
                             }
                             db.doc(doc.ref.path).set(data).then().catch();
                         });
@@ -525,7 +545,7 @@ export const AddDatabaseField = functions.https.onRequest((request, response) =>
                         console.log('Error getting documents', err);
                     });
             }
-            gratisIdx += 1
+            gratisPaths = nextCollections
         }
         response.redirect(303, "success");
     } else {
@@ -741,24 +761,34 @@ function parseValue(value: string, valueType: string): any {
 }
 
 function setNotificationData(notificationData:any) {
-    for (const time of ['before', 'during', 'after']) {
-        if (!('time' in notificationData)) {
-            notificationData[time]['time'] = '00:10:00'
+    if (notificationData != undefined) {
+        for (const time of ['before', 'during', 'after']) {
+            if (!(time in notificationData)) {
+                notificationData[time] = {}
+            }
+            if (!('time' in notificationData)) {
+                notificationData[time]['time'] = '00:10:00'
+            } else {
+                if (notificationData[time]['time'] === 0) {
+                    notificationData[time]['time'] = '00:10:00'
+                }
+            }
+            if (!('message' in notificationData)) {
+                notificationData[time]['message'] = ''
+            }
+            if (!('is_enabled' in notificationData)) {
+                notificationData[time]['is_enabled'] = false
+            }
+            if (!('is_set' in notificationData)) {
+                notificationData[time]['is_set'] = false
+            }
+            delete notificationData[time]['is_toggled']
         }
-        if (!('message' in notificationData)) {
-            notificationData[time]['message'] = ''
-        }
-        if (!('is_enabled' in notificationData)) {
-            notificationData[time]['is_enabled'] = false
-        }
-        if (!('is_set' in notificationData)) {
-            notificationData[time]['is_set'] = false
-        }
+        delete notificationData['is_set']
+        delete notificationData['message']
+        delete notificationData['is_enabled']
+        delete notificationData['time']
     }
-    delete notificationData['is_set']
-    delete notificationData['message']
-    delete notificationData['is_enabled']
-    delete notificationData['time']
 }
 
 function deleteFields(data:any) {
