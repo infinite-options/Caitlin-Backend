@@ -708,6 +708,32 @@ exports.RecursiveDelete = functions
     });
 });
 
+/**
+find the user with email id
+*/
+exports.FindUserDoc = functions.https.onCall(async (data, context) => {
+    // Grab the text parameter.
+    let emailId = data.emailId;
+    var userDetails = {id:""};
+    let users = db.collection('users');
+    let userData = users.where('email_id', '==', emailId );
+    await userData.get()
+        .then(snapshot => {
+            if (snapshot.empty) {
+                console.log('No matching documents.');
+                return "User Not Found";
+            }
+        snapshot.forEach(doc => {
+            userDetails.id = doc.id
+            console.log(userDetails);
+        });
+    })
+        .catch(err => {
+        console.log('Error getting documents', err);
+    });
+
+    return userDetails;
+});
 
 function getCurrentDateTimeUTC() {
     const today = new Date()
