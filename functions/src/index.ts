@@ -279,12 +279,14 @@ export const StartGoalOrRoutine = functions.https.onRequest((request, response) 
 
                 if (routines['goals&routines'][routineNumber].id === routineId) {
                     routines['goals&routines'][routineNumber].is_in_progress = true;
+                    routines['goals&routines'][routineNumber].is_complete = false;
                     routines['goals&routines'][routineNumber].datetime_started = getCurrentDateTimeUTC()
                     user.set(routines).then().catch();
                 } else {
                     for (let i: number = 0; i < routines['goals&routines'].length; i++) {
                         if (routines['goals&routines'][i].id === routineId) {
                             routines['goals&routines'][i].is_in_progress = true;
+                            routines['goals&routines'][i].is_complete = false;
                             routines['goals&routines'][i].datetime_started = getCurrentDateTimeUTC()
                             user.set(routines).then().catch();
                         }
@@ -321,11 +323,13 @@ export const StartActionOrTask = functions.https.onRequest((request, response) =
 
                 if (tasks['actions&tasks'][taskNumber].id === taskId) {
                     tasks['actions&tasks'][taskNumber].is_in_progress = true;
+                    tasks['actions&tasks'][taskNumber].is_complete = true;
                     tasks['actions&tasks'][taskNumber].datetime_started = getCurrentDateTimeUTC()
                     routine.set(tasks).then().catch();
                 } else {
                     for (let i: number = 0; i < tasks['actions&tasks'].length; i++) {
                         if (tasks['actions&tasks'][i].id === taskId) {
+                            tasks['actions&tasks'][i].is_complete = true;
                             tasks['actions&tasks'][i].is_complete = true;
                             tasks['actions&tasks'][i].datetime_started = getCurrentDateTimeUTC()
                             routine.set(tasks).then().catch();
@@ -362,6 +366,7 @@ export const StartInstructionOrStep = functions.https.onRequest((request, respon
                 // console.log('Document data:', doc.data());
 
                 steps['instructions&steps'][stepNumber].is_in_progress = true;
+                steps['instructions&steps'][stepNumber].is_complete = true;
                 steps['instructions&steps'][stepNumber].datetime_started = getCurrentDateTimeUTC()
 
                 task.set(steps).then().catch();
@@ -502,9 +507,12 @@ export const GRUserNotificationSetToTrue = functions.https.onRequest((request, r
     const userId = request.get('userId')?.toString()
     const routineId = request.get('routineId')?.toString()
     const routineNumberReq = request.get('routineNumber')?.toString()
+    const status = request.get('status')?.toString()
     let routineNumber: number
+    const statusOptions = ['before', 'during', 'after']
 
-    if (userId && routineId && routineNumberReq) {
+
+    if (userId && routineId && routineNumberReq && status && status in statusOptions) {
         const user = db.collection('users').doc(userId)
         user.get()
         .then(doc => {
@@ -516,12 +524,14 @@ export const GRUserNotificationSetToTrue = functions.https.onRequest((request, r
                 // console.log('Document data:', doc.data());
 
                 if (routines['goals&routines'][routineNumber].id === routineId) {
-                    routines['goals&routines'][routineNumber].user_notification_set = true;
+                    routines['goals&routines'][routineNumber]['user_notifications'][status]['is_set'] = true;
+                    routines['goals&routines'][routineNumber]['user_notifications'][status]['date_set'] = getCurrentDateTimeUTC();
                     user.set(routines).then().catch();
                 } else {
                     for (let i: number = 0; i < routines['goals&routines'].length; i++) {
                         if (routines['goals&routines'][i].id === routineId) {
-                            routines['goals&routines'][i].user_notification_set = true;
+                            routines['goals&routines'][i]['user_notifications'][status]['is_set'] = true;
+                            routines['goals&routines'][i]['user_notifications'][status]['date_set'] = getCurrentDateTimeUTC();
                             user.set(routines).then().catch();
                         }
                     }
@@ -532,8 +542,10 @@ export const GRUserNotificationSetToTrue = functions.https.onRequest((request, r
         .catch(err => {
             console.log('Error getting document', err);
         });
+        response.redirect(303, 'success');
+    } else {
+        response.redirect(500, 'Internal Server Error');
     }
-    response.redirect(303, 'success');
 });
 
 export const AddNotificationField = functions.https.onRequest(async (request, response) => {
@@ -716,6 +728,39 @@ export const AddDatabaseField = functions.https.onRequest(async (request, respon
     }
 });
 
+export const ResetGratisStatus = functions.https.onRequest(async (request, response) => {
+
+    let gratisPaths: string[] = []
+    const gratisStrings: string[] = ['goals&routines', 'actions&tasks', 'instructions&steps']
+
+    gratisPaths.push('users')
+
+    for (let i = 0; i < gratisStrings.length; i++) {
+        console.log('gratisPaths: ' + gratisPaths)
+        const nextCollections: string[] = []
+        for (const gratisPath of gratisPaths) {
+            await db.collection(gratisPath).get()
+                .then(snapshot => {
+                    snapshot.forEach(doc => {
+                        const data = doc.data()
+                        nextCollections.push(doc.ref.path + '/' + gratisStrings[i])
+
+                        for (const gratisData of data[gratisStrings[i]]) {
+                            gratisData['is_complete'] = false
+                            gratisData['is_in_progress'] = false
+                        }
+                        db.doc(doc.ref.path).set(data).then().catch();
+                    });
+                })
+                .catch(err => {
+                    console.log('Error getting documents', err);
+                });
+        }
+        gratisPaths = nextCollections
+    }
+    response.redirect(303, 'success');
+});
+
 export const CopyDocDataToChild = functions.https.onRequest((request, response) => {
     // Grab the text parameter.
     const collection = request.get('collection')?.toString()
@@ -862,16 +907,16 @@ exports.RecursiveDelete = functions
 })
 .https.onCall((data, context) => {
     // Only allow admin users to execute this function.
-    if (!(context.auth && context.auth.token && context.auth.token.admin)) {
-        throw new functions.https.HttpsError(
-            'permission-denied',
-            'Must be an administrative user to initiate delete.'
-        );
-    }
+    // if (!(context.auth && context.auth.token && context.auth.token.admin)) {
+    //     throw new functions.https.HttpsError(
+    //         'permission-denied',
+    //         'Must be an administrative user to initiate delete.'
+    //     );
+    // }
 
     const path = data.path;
     console.log(
-        `User ${context.auth.uid} has requested to delete path ${path}`
+        `Apoorv has requested to delete path ${path}`
     );
 
     // Run a recursive delete on the given document or collection path.
