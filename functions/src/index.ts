@@ -9,6 +9,42 @@ admin.initializeApp({
 
 const db = admin.firestore();
 
+export const UpdateTitleFilter = functions.https.onRequest(async (request, response) => {
+
+    let gratisPaths: string[] = []
+    const gratisStrings: string[] = ['goals&routines', 'actions&tasks', 'instructions&steps']
+    const docIdTitles = Object()
+
+    gratisPaths.push('users')
+
+    for (const gratisString of gratisStrings) {
+        const nextCollections: string[] = []
+        for (const gratisPath of gratisPaths) {
+            await db.collection(gratisPath).get()
+                .then(snapshot => {
+                    snapshot.forEach(doc => {
+                        const data = doc.data()
+                        if (doc.id in docIdTitles) {
+                            data['title'] = docIdTitles[doc.id]
+                            db.doc(doc.ref.path).set(data).then().catch();
+                        }
+                        if (gratisString != 'instructions&steps') {
+                            nextCollections.push(doc.ref.path + '/' + gratisString)
+                            for (const gratisData of data[gratisString]) {
+                                docIdTitles[gratisData['id'].toString()] = gratisData['title']
+                            }
+                        }
+                    });
+                })
+                .catch(err => {
+                    console.log('Error getting documents', err);
+                });
+        }
+        gratisPaths = nextCollections
+    }
+    response.redirect(303, 'success');
+});
+
 export const AddGoalOrRoutine = functions.https.onRequest((request, response) => {
     const userId = request.get('userId')?.toString()
     const routineId = request.get('routineId')?.toString()
@@ -67,9 +103,9 @@ export const AddGoalOrRoutine = functions.https.onRequest((request, response) =>
         .catch(err => {
             console.log('Error getting document', err);
         })
-        response.redirect(303, "success");
+        response.redirect(303, 'success');
     } else {
-        response.redirect(400, "Bad Request: Missing request headers.");
+        response.redirect(400, 'Bad Request: Missing request headers.');
     }
 });
 
@@ -128,7 +164,7 @@ export const AddActionOrTask = functions.https.onRequest((request, response) => 
             console.log('Error getting document', err);
         });
     }
-    response.redirect(303, "success");
+    response.redirect(303, 'success');
 });
 
 export const AddInstructionOrStep = functions.https.onRequest((request, response) => {
@@ -191,7 +227,7 @@ export const AddInstructionOrStep = functions.https.onRequest((request, response
             console.log('Error getting document', err);
         });
     }
-    response.redirect(303, "success");
+    response.redirect(303, 'success');
 });
 
 export const StartTaskStep = functions.https.onRequest((request, response) => {
@@ -220,8 +256,130 @@ export const StartTaskStep = functions.https.onRequest((request, response) => {
             console.log('Error getting document', err);
         });
     }
-    response.redirect(303, "success");
+    response.redirect(303, 'success');
 });
+
+export const StartGoalOrRoutine = functions.https.onRequest((request, response) => {
+    // Grab the text parameter.
+    const userId = request.get('userId')?.toString()
+    const routineId = request.get('routineId')?.toString()
+    const routineNumberReq = request.get('routineNumber')?.toString()
+    let routineNumber: number
+
+    if (userId && routineId && routineNumberReq) {
+        const user = db.collection('users').doc(userId)
+        user.get()
+        .then(doc => {
+            if (!doc.exists) {
+                console.log('No such document!');
+            } else {
+                routineNumber = parseInt(routineNumberReq)
+                const routines = doc.data()!;
+                // console.log('Document data:', doc.data());
+
+                if (routines['goals&routines'][routineNumber].id === routineId) {
+                    routines['goals&routines'][routineNumber].is_in_progress = true;
+                    routines['goals&routines'][routineNumber].is_complete = false;
+                    routines['goals&routines'][routineNumber].datetime_started = getCurrentDateTimeUTC()
+                    user.set(routines).then().catch();
+                } else {
+                    for (let i: number = 0; i < routines['goals&routines'].length; i++) {
+                        if (routines['goals&routines'][i].id === routineId) {
+                            routines['goals&routines'][i].is_in_progress = true;
+                            routines['goals&routines'][i].is_complete = false;
+                            routines['goals&routines'][i].datetime_started = getCurrentDateTimeUTC()
+                            user.set(routines).then().catch();
+                        }
+                    }
+                }
+            }
+            return routineId;
+        })
+        .catch(err => {
+            console.log('Error getting document', err);
+        });
+    }
+    response.redirect(303, 'success');
+});
+
+export const StartActionOrTask = functions.https.onRequest((request, response) => {
+    // Grab the text parameter.
+    const userId = request.get('userId')?.toString()
+    const routineId = request.get('routineId')?.toString()
+    const taskId = request.get('taskId')?.toString()
+    const taskNumberReq = request.get('taskNumber')?.toString()
+    let taskNumber: number
+
+    if (userId && routineId && taskId && taskNumberReq) {
+        const routine = db.collection('users').doc(userId).collection('goals&routines').doc(routineId)
+        routine.get()
+        .then(doc => {
+            if (!doc.exists) {
+                console.log('No such document!');
+            } else {
+                taskNumber = parseInt(taskNumberReq)
+                const tasks = doc.data()!;
+                // console.log('Document data:', doc.data());
+
+                if (tasks['actions&tasks'][taskNumber].id === taskId) {
+                    tasks['actions&tasks'][taskNumber].is_in_progress = true;
+                    tasks['actions&tasks'][taskNumber].is_complete = true;
+                    tasks['actions&tasks'][taskNumber].datetime_started = getCurrentDateTimeUTC()
+                    routine.set(tasks).then().catch();
+                } else {
+                    for (let i: number = 0; i < tasks['actions&tasks'].length; i++) {
+                        if (tasks['actions&tasks'][i].id === taskId) {
+                            tasks['actions&tasks'][i].is_complete = true;
+                            tasks['actions&tasks'][i].is_complete = true;
+                            tasks['actions&tasks'][i].datetime_started = getCurrentDateTimeUTC()
+                            routine.set(tasks).then().catch();
+                        }
+                    }
+                }
+            }
+            return taskId;
+        })
+        .catch(err => {
+            console.log('Error getting document', err);
+        });
+    }
+    response.redirect(303, 'success');
+});
+
+export const StartInstructionOrStep = functions.https.onRequest((request, response) => {
+    // Grab the text parameter.
+    const userId = request.get('userId')?.toString()
+    const routineId = request.get('routineId')?.toString()
+    const taskId = request.get('taskId')?.toString()
+    const stepNumberReq = request.get('stepNumber')?.toString()
+    let stepNumber: number
+
+    if (userId && routineId && taskId && stepNumberReq) {
+        const task = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks').doc(taskId);
+        task.get()
+        .then(doc => {
+            if (!doc.exists) {
+                console.log('No such document!');
+            } else {
+                stepNumber = parseInt(stepNumberReq)
+                const steps = doc.data()!;
+                // console.log('Document data:', doc.data());
+
+                steps['instructions&steps'][stepNumber].is_in_progress = true;
+                steps['instructions&steps'][stepNumber].is_complete = true;
+                steps['instructions&steps'][stepNumber].datetime_started = getCurrentDateTimeUTC()
+
+                task.set(steps).then().catch();
+            }
+            return routineId;
+        })
+        .catch(err => {
+            console.log('Error getting document', err);
+        });
+    }
+    response.redirect(303, 'success');
+});
+
 
 export const CompleteInstructionOrStep = functions.https.onRequest((request, response) => {
     // Grab the text parameter.
@@ -242,6 +400,7 @@ export const CompleteInstructionOrStep = functions.https.onRequest((request, res
                 const steps = doc.data()!;
                 // console.log('Document data:', doc.data());
 
+                steps['instructions&steps'][stepNumber].is_in_progress = false;
                 steps['instructions&steps'][stepNumber].is_complete = true;
                 steps['instructions&steps'][stepNumber].datetime_completed = getCurrentDateTimeUTC()
 
@@ -253,7 +412,7 @@ export const CompleteInstructionOrStep = functions.https.onRequest((request, res
             console.log('Error getting document', err);
         });
     }
-    response.redirect(303, "success");
+    response.redirect(303, 'success');
 });
 
 export const CompleteActionOrTask = functions.https.onRequest((request, response) => {
@@ -276,12 +435,14 @@ export const CompleteActionOrTask = functions.https.onRequest((request, response
                 // console.log('Document data:', doc.data());
 
                 if (tasks['actions&tasks'][taskNumber].id === taskId) {
+                    tasks['actions&tasks'][taskNumber].is_in_progress = false;
                     tasks['actions&tasks'][taskNumber].is_complete = true;
                     tasks['actions&tasks'][taskNumber].datetime_completed = getCurrentDateTimeUTC()
                     routine.set(tasks).then().catch();
                 } else {
                     for (let i: number = 0; i < tasks['actions&tasks'].length; i++) {
                         if (tasks['actions&tasks'][i].id === taskId) {
+                            tasks['actions&tasks'][i].is_in_progress = false;
                             tasks['actions&tasks'][i].is_complete = true;
                             tasks['actions&tasks'][i].datetime_completed = getCurrentDateTimeUTC()
                             routine.set(tasks).then().catch();
@@ -295,7 +456,7 @@ export const CompleteActionOrTask = functions.https.onRequest((request, response
             console.log('Error getting document', err);
         });
     }
-    response.redirect(303, "success");
+    response.redirect(303, 'success');
 });
 
 export const CompleteGoalOrRoutine = functions.https.onRequest((request, response) => {
@@ -317,12 +478,14 @@ export const CompleteGoalOrRoutine = functions.https.onRequest((request, respons
                 // console.log('Document data:', doc.data());
 
                 if (routines['goals&routines'][routineNumber].id === routineId) {
+                    routines['goals&routines'][routineNumber].is_in_progress = false;
                     routines['goals&routines'][routineNumber].is_complete = true;
                     routines['goals&routines'][routineNumber].datetime_completed = getCurrentDateTimeUTC()
                     user.set(routines).then().catch();
                 } else {
                     for (let i: number = 0; i < routines['goals&routines'].length; i++) {
                         if (routines['goals&routines'][i].id === routineId) {
+                            routines['goals&routines'][i].is_in_progress = false;
                             routines['goals&routines'][i].is_complete = true;
                             routines['goals&routines'][i].datetime_completed = getCurrentDateTimeUTC()
                             user.set(routines).then().catch();
@@ -336,7 +499,7 @@ export const CompleteGoalOrRoutine = functions.https.onRequest((request, respons
             console.log('Error getting document', err);
         });
     }
-    response.redirect(303, "success");
+    response.redirect(303, 'success');
 });
 
 export const GRUserNotificationSetToTrue = functions.https.onRequest((request, response) => {
@@ -344,9 +507,12 @@ export const GRUserNotificationSetToTrue = functions.https.onRequest((request, r
     const userId = request.get('userId')?.toString()
     const routineId = request.get('routineId')?.toString()
     const routineNumberReq = request.get('routineNumber')?.toString()
+    const status = request.get('status')?.toString()
     let routineNumber: number
+    const statusOptions = ['before', 'during', 'after']
 
-    if (userId && routineId && routineNumberReq) {
+
+    if (userId && routineId && routineNumberReq && status && status in statusOptions) {
         const user = db.collection('users').doc(userId)
         user.get()
         .then(doc => {
@@ -358,12 +524,14 @@ export const GRUserNotificationSetToTrue = functions.https.onRequest((request, r
                 // console.log('Document data:', doc.data());
 
                 if (routines['goals&routines'][routineNumber].id === routineId) {
-                    routines['goals&routines'][routineNumber].user_notification_set = true;
+                    routines['goals&routines'][routineNumber]['user_notifications'][status]['is_set'] = true;
+                    routines['goals&routines'][routineNumber]['user_notifications'][status]['date_set'] = getCurrentDateTimeUTC();
                     user.set(routines).then().catch();
                 } else {
                     for (let i: number = 0; i < routines['goals&routines'].length; i++) {
                         if (routines['goals&routines'][i].id === routineId) {
-                            routines['goals&routines'][i].user_notification_set = true;
+                            routines['goals&routines'][i]['user_notifications'][status]['is_set'] = true;
+                            routines['goals&routines'][i]['user_notifications'][status]['date_set'] = getCurrentDateTimeUTC();
                             user.set(routines).then().catch();
                         }
                     }
@@ -374,12 +542,15 @@ export const GRUserNotificationSetToTrue = functions.https.onRequest((request, r
         .catch(err => {
             console.log('Error getting document', err);
         });
+        response.redirect(303, 'success');
+    } else {
+        response.redirect(500, 'Internal Server Error');
     }
-    response.redirect(303, "success");
 });
 
 export const AddNotificationField = functions.https.onRequest(async (request, response) => {
 
+    let batch = db.batch();
     const atCollections: string[] = []
     const isCollections: string[] = []
 
@@ -387,14 +558,21 @@ export const AddNotificationField = functions.https.onRequest(async (request, re
     .then(snapshot => {
         snapshot.forEach(doc => {
             const data = doc.data()
-            for (const grItem of data['goals&routines']) {
-                setNotificationData(grItem['ta_notifications'])
-                setNotificationData(grItem['user_notifications'])
+            if (Array.isArray(data['goals&routines']) && data['goals&routines'].length) {
+                for (const grItem of data['goals&routines']) {
+                    if (!('ta_notifications' in grItem)) {
+                        grItem['ta_notifications'] = {}
+                    }
+                    if (!('user_notifications' in grItem)) {
+                        grItem['user_notifications'] = {}
+                    }
+                    setNotificationData(grItem['ta_notifications'])
+                    setNotificationData(grItem['user_notifications'])
+                    deleteFields(grItem)
+                }
                 atCollections.push(doc.ref.path + '/goals&routines')
-                deleteFields(grItem)
+                batch.set(db.doc(doc.ref.path), data, {merge: true})
             }
-
-            db.doc(doc.ref.path).set(data).then().catch();
         });
     })
     .catch(err => {
@@ -402,17 +580,25 @@ export const AddNotificationField = functions.https.onRequest(async (request, re
     });
 
     for (const collection of atCollections) {
-        db.collection(collection).get()
+        await db.collection(collection).get()
             .then(snapshot => {
                 snapshot.forEach(doc => {
                     const data = doc.data()
-                    for (const grItem of data['actions&tasks']) {
-                        setNotificationData(grItem['ta_notifications'])
-                        setNotificationData(grItem['user_notifications'])
-                        atCollections.push(doc.ref.path + '/actions&tasks')
-                        deleteFields(grItem)
+                    if (Array.isArray(data['actions&tasks']) && data['actions&tasks'].length) {
+                        for (const atItem of data['actions&tasks']) {
+                            if (!('ta_notifications' in atItem)) {
+                                atItem['ta_notifications'] = {}
+                            }
+                            if (!('user_notifications' in atItem)) {
+                                atItem['user_notifications'] = {}
+                            }
+                            setNotificationData(atItem['ta_notifications'])
+                            setNotificationData(atItem['user_notifications'])
+                            deleteFields(atItem)
+                        }
+                        isCollections.push(doc.ref.path + '/actions&tasks')
+                        batch.set(db.doc(doc.ref.path), data, {merge: true})
                     }
-                    db.doc(doc.ref.path).set(data).then().catch();
                 });
             })
             .catch(err => {
@@ -425,20 +611,32 @@ export const AddNotificationField = functions.https.onRequest(async (request, re
             .then(snapshot => {
                 snapshot.forEach(doc => {
                     const data = doc.data()
-                    for (const grItem of data['instructions&steps']) {
-                        setNotificationData(grItem['ta_notifications'])
-                        setNotificationData(grItem['user_notifications'])
-                        atCollections.push(doc.ref.path + '/instructions&steps')
-                        deleteFields(grItem)
+                    if (Array.isArray(data['instructions&steps']) && data['instructions&steps'].length) {
+                        for (const isItem of data['instructions&steps']) {
+                            if (!('ta_notifications' in isItem)) {
+                                isItem['ta_notifications'] = {}
+                            }
+                            if (!('user_notifications' in isItem)) {
+                                isItem['user_notifications'] = {}
+                            }
+                            setNotificationData(isItem['ta_notifications'])
+                            setNotificationData(isItem['user_notifications'])
+                            deleteFields(isItem)
+                        }
+                        batch.set(db.doc(doc.ref.path), data, {merge: true})
                     }
-                    db.doc(doc.ref.path).set(data).then().catch();
                 });
             })
             .catch(err => {
                 console.log('Error getting documents', err);
             });
     }
-    response.redirect(303, "success");
+    // Commit the batch
+    return batch.commit().then(function () {
+      // ...
+    });
+
+    response.redirect(303, 'success');
 });
 
 export const AddCollectionField = functions.https.onRequest(async (request, response) => {
@@ -484,39 +682,36 @@ export const AddCollectionField = functions.https.onRequest(async (request, resp
             }
             gratisPaths = nextCollections
         }
-        response.redirect(303, "success");
+        response.redirect(303, 'success');
     } else {
-        response.redirect(500, "Internal Server Error");
+        response.redirect(500, 'Internal Server Error');
     }
 });
 
-export const AddDatabaseField = functions.https.onRequest((request, response) => {
+export const AddDatabaseField = functions.https.onRequest(async (request, response) => {
     // Grab the text parameter.
     const field = request.get('field')?.toString() // 'expected_time'
     const valueType = request.get('valueType')?.toString() // string
     const valueReq = request.get('value')?.toString() // '00:10:00'
 
     if (field && valueType && valueReq) {
+        let gratisPaths: string[] = []
+        const gratisStrings: string[] = ['goals&routines', 'actions&tasks', 'instructions&steps']
 
-        let grCollections: string[] = []
-        let atCollections: string[] = []
-        let isCollections: string[] = []
+        gratisPaths.push('users')
 
-        grCollections.push('users')
-
-        const gratisCollections: string[][] = [grCollections, atCollections, isCollections]
-        const gratisStrings = ['goals&routines', 'actions&tasks', 'instructions&steps']
-        let gratisIdx = 0;
-
-        for (const gratisCollection of gratisCollections) {
-            for (const gratisPath of gratisCollection) {
-                db.collection(gratisPath).get()
+        for (let i = 0; i < gratisStrings.length; i++) {
+            console.log('gratisPaths: ' + gratisPaths)
+            const nextCollections: string[] = []
+            for (const gratisPath of gratisPaths) {
+                await db.collection(gratisPath).get()
                     .then(snapshot => {
                         snapshot.forEach(doc => {
                             const data = doc.data()
-                            for (const gratisData of data[gratisStrings[gratisIdx]]) {
+                            nextCollections.push(doc.ref.path + '/' + gratisStrings[i])
+
+                            for (const gratisData of data[gratisStrings[i]]) {
                                 gratisData[field] = parseValue(valueReq, valueType)
-                                gratisCollections[(gratisIdx + 1) % 3].push(doc.ref.path + '/' + gratisStrings[gratisIdx])
                             }
                             db.doc(doc.ref.path).set(data).then().catch();
                         });
@@ -525,12 +720,45 @@ export const AddDatabaseField = functions.https.onRequest((request, response) =>
                         console.log('Error getting documents', err);
                     });
             }
-            gratisIdx += 1
+            gratisPaths = nextCollections
         }
-        response.redirect(303, "success");
+        response.redirect(303, 'success');
     } else {
-        response.redirect(500, "Internal Server Error");
+        response.redirect(500, 'Internal Server Error');
     }
+});
+
+export const ResetGratisStatus = functions.https.onRequest(async (request, response) => {
+
+    let gratisPaths: string[] = []
+    const gratisStrings: string[] = ['goals&routines', 'actions&tasks', 'instructions&steps']
+
+    gratisPaths.push('users')
+
+    for (let i = 0; i < gratisStrings.length; i++) {
+        console.log('gratisPaths: ' + gratisPaths)
+        const nextCollections: string[] = []
+        for (const gratisPath of gratisPaths) {
+            await db.collection(gratisPath).get()
+                .then(snapshot => {
+                    snapshot.forEach(doc => {
+                        const data = doc.data()
+                        nextCollections.push(doc.ref.path + '/' + gratisStrings[i])
+
+                        for (const gratisData of data[gratisStrings[i]]) {
+                            gratisData['is_complete'] = false
+                            gratisData['is_in_progress'] = false
+                        }
+                        db.doc(doc.ref.path).set(data).then().catch();
+                    });
+                })
+                .catch(err => {
+                    console.log('Error getting documents', err);
+                });
+        }
+        gratisPaths = nextCollections
+    }
+    response.redirect(303, 'success');
 });
 
 export const CopyDocDataToChild = functions.https.onRequest((request, response) => {
@@ -598,7 +826,7 @@ export const CopyDocDataToChild = functions.https.onRequest((request, response) 
         });
     }
 
-    response.redirect(303, "success");
+    response.redirect(303, 'success');
 });
 
 export const SetUserGoogleAuthToken = functions.https.onRequest((request, response) => {
@@ -628,7 +856,7 @@ export const SetUserGoogleAuthToken = functions.https.onRequest((request, respon
             console.log('Error getting document', err);
         });
     }
-    response.redirect(303, "success");
+    response.redirect(303, 'success');
 });
 
 export const SetUserGoogleRefreshToken = functions.https.onRequest((request, response) => {
@@ -658,13 +886,13 @@ export const SetUserGoogleRefreshToken = functions.https.onRequest((request, res
             console.log('Error getting document', err);
         });
     }
-    response.redirect(303, "success");
+    response.redirect(303, 'success');
 });
 
 /**
 * Initiate a recursive delete of documents at a given path.
 *
-* The calling user must be authenticated and have the custom "admin" attribute
+* The calling user must be authenticated and have the custom 'admin' attribute
 * set to true on the auth token.
 *
 * This delete is NOT an atomic operation and it's possible
@@ -679,16 +907,16 @@ exports.RecursiveDelete = functions
 })
 .https.onCall((data, context) => {
     // Only allow admin users to execute this function.
-    if (!(context.auth && context.auth.token && context.auth.token.admin)) {
-        throw new functions.https.HttpsError(
-            'permission-denied',
-            'Must be an administrative user to initiate delete.'
-        );
-    }
+    // if (!(context.auth && context.auth.token && context.auth.token.admin)) {
+    //     throw new functions.https.HttpsError(
+    //         'permission-denied',
+    //         'Must be an administrative user to initiate delete.'
+    //     );
+    // }
 
     const path = data.path;
     console.log(
-        `User ${context.auth.uid} has requested to delete path ${path}`
+        `Apoorv has requested to delete path ${path}`
     );
 
     // Run a recursive delete on the given document or collection path.
@@ -767,24 +995,34 @@ function parseValue(value: string, valueType: string): any {
 }
 
 function setNotificationData(notificationData:any) {
-    for (const time of ['before', 'during', 'after']) {
-        if (!('time' in notificationData)) {
-            notificationData[time]['time'] = '00:10:00'
+    if (notificationData != undefined) {
+        for (const time of ['before', 'during', 'after']) {
+            if (!(time in notificationData)) {
+                notificationData[time] = {}
+            }
+            if (!('time' in notificationData)) {
+                notificationData[time]['time'] = '00:10:00'
+            } else {
+                if (notificationData[time]['time'] === 0) {
+                    notificationData[time]['time'] = '00:10:00'
+                }
+            }
+            if (!('message' in notificationData)) {
+                notificationData[time]['message'] = ''
+            }
+            if (!('is_enabled' in notificationData)) {
+                notificationData[time]['is_enabled'] = false
+            }
+            if (!('is_set' in notificationData)) {
+                notificationData[time]['is_set'] = false
+            }
+            delete notificationData[time]['is_toggled']
         }
-        if (!('message' in notificationData)) {
-            notificationData[time]['message'] = ''
-        }
-        if (!('is_enabled' in notificationData)) {
-            notificationData[time]['is_enabled'] = false
-        }
-        if (!('is_set' in notificationData)) {
-            notificationData[time]['is_set'] = false
-        }
+        delete notificationData['is_set']
+        delete notificationData['message']
+        delete notificationData['is_enabled']
+        delete notificationData['time']
     }
-    delete notificationData['is_set']
-    delete notificationData['message']
-    delete notificationData['is_enabled']
-    delete notificationData['time']
 }
 
 function deleteFields(data:any) {
