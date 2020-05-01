@@ -512,7 +512,7 @@ export const GRUserNotificationSetToTrue = functions.https.onRequest((request, r
     const statusOptions = ['before', 'during', 'after']
 
 
-    if (userId && routineId && routineNumberReq && status && status in statusOptions) {
+    if (userId && routineId && routineNumberReq && status && statusOptions.includes(status)) {
         const user = db.collection('users').doc(userId)
         user.get()
         .then(doc => {
@@ -949,13 +949,15 @@ exports.FindUserDoc = functions.https.onCall(async (data, context) => {
         .then(snapshot => {
             if (snapshot.empty) {
                 console.log('No matching documents.');
-                return "User Not Found";
+                return "";
+            } else {
+                snapshot.forEach(doc => {
+                    userDetails.id = doc.id
+                    console.log(userDetails);
+                });
+                return userDetails;
             }
-        snapshot.forEach(doc => {
-            userDetails.id = doc.id
-            console.log(userDetails);
-        });
-    })
+        })
         .catch(err => {
         console.log('Error getting documents', err);
     });
@@ -995,7 +997,7 @@ function parseValue(value: string, valueType: string): any {
 }
 
 function setNotificationData(notificationData:any) {
-    if (notificationData != undefined) {
+    if (notificationData !== undefined) {
         for (const time of ['before', 'during', 'after']) {
             if (!(time in notificationData)) {
                 notificationData[time] = {}
