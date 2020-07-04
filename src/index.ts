@@ -543,8 +543,10 @@ export const GRUserNotificationSetToTrue = functions.https.onRequest((request, r
     .catch(err => {
       console.log('Error getting document', err);
     });
+    response.redirect(303, 'success');
+  } else {
+        response.redirect(500, 'Internal Server Error');
   }
-  response.redirect(303, 'success');
 });
 
 export const AddNotificationField = functions.https.onRequest(async (request, response) => {
@@ -923,7 +925,7 @@ exports.RecursiveDelete = functions
   // at the command line by running 'firebase login:ci'.
   return firebase_tools.firestore
   .delete(path, {
-    project: process.env.GCLOUD_PROJECT,
+    project: serviceAccount.project_id,
     recursive: true,
     yes: true,
     token: functions.config().fb.token
@@ -939,35 +941,34 @@ exports.RecursiveDelete = functions
 find the user with email id
 */
 exports.FindUserDoc = functions.https.onCall(async (data, context) => {
-  // Grab the text parameter.
-  let emailId = data.emailId;
-  var emailId1 = emailId.toLowerCase();
-  var email = emailId1.split("@");
-  email[0] = email[0].split(".").join("");
-  email[0] = email[0].concat("@");
-  var emailId_final = email[0].concat(email[1]);
-  console.log(emailId1);
-  console.log(emailId_final);
-  var userDetails = {id:""};
-  let users = db.collection('users');
-  let userData = users.where('email_id', '==', emailId_final );
-  await userData.get()
-  .then(snapshot => {
-    if (snapshot.empty) {
-      console.log('No matching documents.');
-      return "User Not Found";
-    }
-    snapshot.forEach(doc => {
-      userDetails.id = doc.id
-      return "User found"
-    });
-    return ""
-  })
-  .catch(err => {
-    console.log('Error getting documents', err);
-  });
+    // Grab the text parameter.
+    let emailId = data.emailId;
+    var emailId1 = emailId.toLowerCase();
+    var email = emailId1.split("@");
+    email[0] = email[0].split(".").join("");
+    email[0] = email[0].concat("@");
+    var emailId_final = email[0].concat(email[1]);
+    console.log(emailId1);
+    console.log(emailId_final);
+    var userDetails = {id:""};
+    let users = db.collection('users');
+    let userData = users.where('email_id', '==', emailId_final );
+    await userData.get()
+        .then(snapshot => {
+            if (snapshot.empty) {
+                console.log('No matching documents.');
+                //return "User Not Found";
+            }
+            snapshot.forEach(doc => {
+                userDetails.id = doc.id
+                console.log(userDetails);
+            });
+        })
+        .catch(err => {
+        console.log('Error getting documents', err);
+        });
 
-  return userDetails;
+    return userDetails;
 });
 
 exports.LogGRHistory = functions.https.onRequest((req, res) => {
@@ -1026,6 +1027,269 @@ exports.LogGRHistory = functions.https.onRequest((req, res) => {
     res.redirect(303, 'success');
   });
 });
+
+/**
+Copy structure of the user
+*/
+
+/*
+exports.CopyStructureFromUser = functions.https.onCall(async (data, context) => {
+    // Grab the text parameter.
+    var userId = "7R6hAVmDrNutRkG3sVRy";
+    var userDetails;
+    let users = db.collection('users').doc(userId);
+    await users.get().then(snapshot => {
+            if (!snapshot.exists) {
+                console.log('No matching documents.');
+                return "User Not Found";
+            } else {
+                userDetails = snapshot.data();
+                var userData = userDetails;
+                console.log(userDetails);
+                for (let key in userDetails) { 
+                    if (userDetails.hasOwnProperty(key)) 
+                    { 
+                        //var value = userDetails[key]; 
+                        //console.log(key, value);
+                        if (key == "goals&routines")
+                        {
+                            userData[key] = [];
+                            
+                        } else if (key == "about_me"){
+                            
+                            var temp = userDetails[key];
+                            for (let key1 in temp) {
+                                if (temp.hasOwnProperty(key1)) 
+                                {
+                                    temp[key1] = "";
+                                }
+                            }
+                            userData[key] = temp;
+                            
+                        } else {
+                            userData[key] = "";
+                        }
+                    } 
+                }
+                
+                console.log(userData);
+            }
+        })
+        .catch(err => {
+        console.log('Error getting documents', err);
+        });
+
+    return userDetails;
+});
+*/
+
+/**
+Save details of the photos
+*/
+/*
+exports.SavePhotoDetails = functions.https.onCall(async (data, context) => {
+    // Grab the text parameter.
+    let userId = data.userId;
+    let photo_id = data.photoId;
+    let desc = data.desc;
+    let notes = data.notes;
+    console.log(userId);
+    var userDetails = {photo_id:"", description:"", notes:""};
+    let users = db.collection('users').doc(userId);
+    let userData = users.collection('photo').doc(photo_id);
+    await users.get()
+        .then(async snapshot => {
+            if (!snapshot.exists) {
+                console.log('No matching documents.');
+            }else {
+                await userData.get()
+                    .then(snapshot => {
+                        if (!snapshot.exists) {
+                            console.log('No matching photos.');
+                            userDetails["photo_id"] = photo_id;
+                            userDetails["description"] = desc;
+                            userDetails["notes"] = notes;
+                            userData.set(userDetails).then()
+                            .catch(err => {
+                            console.log('Error getting documents', err);
+                            });
+                        } else {
+                            console.log(snapshot.data());
+                            userDetails = snapshot.data();
+                            userDetails["photo_id"] = photo_id;
+                            userDetails["description"] = desc;
+                            userDetails["notes"] = notes;
+                            userData.set(userDetails).then()
+                            .catch(err => {
+                            console.log('Error getting documents', err);
+                            });
+                        }
+
+                    })
+                    .catch(err => {
+                    console.log('Error getting documents', err);
+                    });
+            }
+        })
+    return userDetails;
+});
+*/
+
+/**
+Get details of the photos
+*/
+/*
+exports.GetPhotoDetails = functions.https.onCall(async (data, context) => {
+    // Grab the text parameter.
+    let userId = data.userId;
+    let photo_id = data.photoId;
+    var userDetails = {photo_id:"", description:"", notes:""};
+    let users = db.collection('users').doc(userId);
+    let userData = users.collection('photo').doc(photo_id);
+    await userData.get()
+        .then(snapshot => {
+            if (!snapshot.exists) {
+                console.log('No matching photos.');
+                            
+            } else {
+                console.log(snapshot.data());
+                userDetails = snapshot.data();
+            }
+        })
+        .catch(err => {
+            console.log('Error getting documents', err);
+        });
+    return userDetails;
+});
+*/
+
+/**
+copy data from one user to another
+*/
+/*
+exports.CopyUserData = functions.https.onCall(async (data, context) => {
+    // Grab the text parameter.
+    let copy_from_user = data.copy_from_user;
+    let copy_to_user = data.copy_to_user;
+    var userDetails = {};
+    var userData = {};
+    let users = db.collection('users');
+    let sourceUser = users.doc(copy_from_user);
+    let sourceUserGR = sourceUser.collection('goals&routines');
+    let destUser = users.doc(copy_to_user);
+    let destUserGR = destUser.collection('goals&routines');
+    await sourceUser.get()
+        .then(async snapshot => {
+            if (!snapshot.exists) {
+                console.log('No matching documents.');
+                return "User Not Found";
+            } else {
+                userDetails = snapshot.data();
+                for (let key in userDetails) { 
+                    if (userDetails.hasOwnProperty(key)) 
+                    { 
+                        if (key == "goals&routines")
+                        {
+                            userData[key] = userDetails[key]
+                            
+                        }  else {
+
+                            continue;
+                        }
+                    } 
+                }
+                await destUser.set(userData).then()
+                    .catch(err => {
+                    console.log('Error getting documents', err);
+                    });
+                await sourceUserGR.get()
+                    .then(snap => {
+                        snap.forEach(async doc => {
+                        var id = doc.id;
+                        var userDetailsGR = doc.data();
+                        await destUserGR.doc(id).set(userDetailsGR).then()
+                            .catch(err => {
+                                console.log('Error getting documents', err);
+                            });
+
+                        await sourceUserGR.doc(id).collection('actions&tasks').get()
+                            .then(snapAT => {
+                                console.log(snapAT.size);
+                                snapAT.forEach(async docu => {
+                                var atid = docu.id;
+                                var userDetailsGR = docu.data();
+                                await destUserGR.doc(id).collection('actions&tasks').doc(atid).set(userDetailsGR).then()
+                                .catch(err => {
+                                    console.log('Error getting documents', err);
+                                });
+                                });
+                            })
+                            .catch(err => {
+                                    console.log('Error getting documents', err);
+                            });
+                        });
+                    })
+                    .catch(err => {
+                        console.log('Error getting documents', err);
+                    });
+            }
+        })
+        .catch(err => {
+        console.log('Error getting documents', err);
+        });
+
+    return userDetails;
+});
+*/
+
+/**
+List Icons in Storage
+*/
+/*
+exports.ListIconsFromStorage = functions.https.onCall(async (data, context) => {
+    // Grab the text parameter.
+    const storage = new Storage();
+    var options = {
+      prefix: "Icons/",
+    };
+    var bucketName = "project-caitlin-c71a9.appspot.com";
+    var [files] = await storage.bucket(bucketName).getFiles(options);
+    
+    //var [url] = await storage
+    //                .bucket(bucketName)
+    //                .file("Icons/alarm-clock.svg")
+    //              .getMetadata();
+
+    //        console.log(url.metadata.firebaseStorageDownloadTokens);
+    var tokens = new Array();
+    var filenames = new Array();
+    console.log('Files:');
+    files.forEach(async file => {
+            if (file.name != "Icons/") {
+                //console.log(file.name);
+                filenames.push(file.name);
+            }
+        
+    });
+    for(var name of filenames){
+        var [meta] = await storage
+                    .bucket(bucketName)
+                    .file(name)
+                    .getMetadata();
+        //console.log(meta.metadata.firebaseStorageDownloadTokens);
+        var filename = name.replace("/", "%2F");
+        var url = "https://firebasestorage.googleapis.com/v0/b/project-caitlin-c71a9.appspot.com/o/" ;
+        url += filename;
+        url += "?alt=media&token=";
+        url += meta.metadata.firebaseStorageDownloadTokens;
+        console.log(url);
+        tokens.push(meta.metadata.firebaseStorageDownloadTokens);
+    }
+    
+    
+    return tokens;
+});
+*/
 
 function getCurrentDateTimeUTC() {
   const today = new Date()

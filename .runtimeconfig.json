@@ -1,11 +1,11 @@
 {
   "fb": {
-    "token": "1//06xsKbtztHLBxCgYIARAAGAYSNwF-L9IrZrhlZypLmh6A4834-UkipSVQmK4aIQepxKC0RvfR8SnhJ1LhoAvjYATrYHLS5F0-KlI"
+    "token": "1//06tu9SPs0kdDRCgYIARAAGAYSNwF-L9Ir39FrmG3HgMJFLyHbh4PFYRFcRGbIENIAdtaIpxAW6peadGfMDTSMZkLAEgzm_obRfUQ"
   },
   "firebase": {
-    "projectId": "project-caitlin-c71a9",
-    "databaseURL": "https://project-caitlin-c71a9.firebaseio.com",
-    "storageBucket": "project-caitlin-c71a9.appspot.com",
+    "projectId": "myspace-db",
+    "databaseURL": "https://myspace-db.firebaseio.com",
+    "storageBucket": "myspace-db.appspot.com",
     "locationId": "us-west2"
   }
 }
