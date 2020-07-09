@@ -260,11 +260,15 @@ export const StartTaskStep = functions.https.onRequest((request, response) => {
   response.redirect(303, 'success');
 });
 
-export const StartGoalOrRoutine = functions.https.onRequest((request, response) => {
+//export const StartGoalOrRoutine = functions.https.onRequest((request, response) => {
+export const StartGoalOrRoutine = functions.https.onCall(async (data, context)  => {
   // Grab the text parameter.
-  const userId = request.get('userId')?.toString()
+  /*const userId = request.get('userId')?.toString()
   const routineId = request.get('routineId')?.toString()
-  const routineNumberReq = request.get('routineNumber')?.toString()
+  const routineNumberReq = request.get('routineNumber')?.toString()*/
+  let userId = data.userId;
+  let routineId = data.routineId;
+  let routineNumberReq = data.routineNumberReq;
   let routineNumber: number
 
   if (userId && routineId && routineNumberReq) {
@@ -275,7 +279,7 @@ export const StartGoalOrRoutine = functions.https.onRequest((request, response) 
         console.log('No such document!');
       } else {
         routineNumber = parseInt(routineNumberReq)
-        const routines = doc.data()!;
+        var routines = doc.data()!;
         // console.log('Document data:', doc.data());
 
         if (routines['goals&routines'][routineNumber].id === routineId) {
@@ -293,22 +297,30 @@ export const StartGoalOrRoutine = functions.https.onRequest((request, response) 
             }
           }
         }
+        return true;
       }
-      return routineId;
+      return false;
+      //return routineId;
     })
     .catch(err => {
       console.log('Error getting document', err);
     });
   }
-  response.redirect(303, 'success');
+  //response.redirect(303, 'success');
+  return false;
 });
 
-export const StartActionOrTask = functions.https.onRequest((request, response) => {
+//export const StartActionOrTask = functions.https.onRequest((request, response) => {
+export const StartActionOrTask = functions.https.onCall((data, context) => {
   // Grab the text parameter.
-  const userId = request.get('userId')?.toString()
+  /*const userId = request.get('userId')?.toString()
   const routineId = request.get('routineId')?.toString()
   const taskId = request.get('taskId')?.toString()
-  const taskNumberReq = request.get('taskNumber')?.toString()
+  const taskNumberReq = request.get('taskNumber')?.toString()*/
+  const userId = data.userId;
+  const routineId = data.routineId;
+  const taskId = data.taskId;
+  const taskNumberReq = data.taskNumber;
   let taskNumber: number
 
   if (userId && routineId && taskId && taskNumberReq) {
@@ -337,22 +349,30 @@ export const StartActionOrTask = functions.https.onRequest((request, response) =
             }
           }
         }
+        return true;
       }
-      return taskId;
+      return false;
+      //return taskId;
     })
     .catch(err => {
       console.log('Error getting document', err);
     });
   }
-  response.redirect(303, 'success');
+  return false;
+  //response.redirect(303, 'success');
 });
 
-export const StartInstructionOrStep = functions.https.onRequest((request, response) => {
+//export const StartInstructionOrStep = functions.https.onRequest((request, response) => {
+export const StartInstructionOrStep = functions.https.onCall((data, context) => {
   // Grab the text parameter.
-  const userId = request.get('userId')?.toString()
+  /*const userId = request.get('userId')?.toString()
   const routineId = request.get('routineId')?.toString()
   const taskId = request.get('taskId')?.toString()
-  const stepNumberReq = request.get('stepNumber')?.toString()
+  const stepNumberReq = request.get('stepNumber')?.toString()*/
+  const userId = data.userId;
+  const routineId = data.routineId;
+  const taskId = data.taskId;
+  const stepNumberReq = data.stepNumber;
   let stepNumber: number
 
   if (userId && routineId && taskId && stepNumberReq) {
@@ -371,14 +391,17 @@ export const StartInstructionOrStep = functions.https.onRequest((request, respon
         steps['instructions&steps'][stepNumber].datetime_started = getCurrentDateTimeUTC()
 
         task.set(steps).then().catch();
+        return true;
       }
-      return routineId;
+      //return routineId;
+      return false;
     })
     .catch(err => {
       console.log('Error getting document', err);
     });
   }
-  response.redirect(303, 'success');
+  //response.redirect(303, 'success
+  return false;
 });
 
 
