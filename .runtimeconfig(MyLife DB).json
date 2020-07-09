@@ -1,0 +1,11 @@
+{
+  "fb": {
+    "token": "1//06tu9SPs0kdDRCgYIARAAGAYSNwF-L9Ir39FrmG3HgMJFLyHbh4PFYRFcRGbIENIAdtaIpxAW6peadGfMDTSMZkLAEgzm_obRfUQ"
+  },
+  "firebase": {
+    "projectId": "manifestmylife",
+    "databaseURL": "https://manifestmylife.firebaseio.com",
+    "storageBucket": "manifestmylife.appspot.com",
+    "locationId": "nam5 (us-central)"
+  }
+}
