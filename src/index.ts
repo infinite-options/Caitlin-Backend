@@ -381,7 +381,6 @@ export const StartInstructionOrStep = functions.https.onRequest((request, respon
   response.redirect(303, 'success');
 });
 
-
 export const CompleteInstructionOrStep = functions.https.onRequest((request, response) => {
   // Grab the text parameter.
   const userId = request.get('userId')?.toString()
@@ -545,7 +544,7 @@ export const GRUserNotificationSetToTrue = functions.https.onRequest((request, r
     });
     response.redirect(303, 'success');
   } else {
-        response.redirect(500, 'Internal Server Error');
+    response.redirect(500, 'Internal Server Error');
   }
 });
 
@@ -729,37 +728,43 @@ export const AddDatabaseField = functions.https.onRequest(async (request, respon
   }
 });
 
-export const ResetGratisStatus = functions.https.onRequest(async (request, response) => {
-
-  let gratisPaths: string[] = []
-  const gratisStrings: string[] = ['goals&routines', 'actions&tasks', 'instructions&steps']
-
-  gratisPaths.push('users')
-
-  for (let i = 0; i < gratisStrings.length; i++) {
-    console.log('gratisPaths: ' + gratisPaths)
-    const nextCollections: string[] = []
-    for (const gratisPath of gratisPaths) {
-      await db.collection(gratisPath).get()
-      .then(snapshot => {
-        snapshot.forEach(doc => {
-          const data = doc.data()
-          nextCollections.push(doc.ref.path + '/' + gratisStrings[i])
-
-          for (const gratisData of data[gratisStrings[i]]) {
-            gratisData['is_complete'] = false
-            gratisData['is_in_progress'] = false
-          }
-          db.doc(doc.ref.path).set(data).then().catch();
+export const ResetGratisStatus = functions.https.onRequest(async (req, res) => {
+  db.collection("users").get()
+  .then((snapshot) =>
+  {
+    snapshot.forEach(doc => {
+      if (doc.data()["goals&routines"] != null) {
+        let arrs = doc.data()["goals&routines"];
+        arrs.forEach((gr: {
+          is_in_progress: boolean,
+          is_complete: boolean,
+          is_set: boolean,
+          datetime_completed: string,
+          datetime_started: string,
+          ta_notifications:   {[index: string]: {is_set: boolean}},
+          user_notifications:  {[index: string]: {is_set: boolean}},
+        }) => {
+          gr['is_in_progress'] = false
+          gr['is_complete'] = false
+          gr['datetime_completed'] = ""
+          gr['datetime_started'] = ""
+          delete gr['is_set'];
+          Object.keys(gr['ta_notifications'])
+          .forEach( (k: string) => {
+            gr['ta_notifications'][k].is_set = false
+          });
+          Object.keys(gr['user_notifications'])
+          .forEach( (k: string) => {
+            gr['user_notifications'][k].is_set = false
+          });
         });
-      })
-      .catch(err => {
-        console.log('Error getting documents', err);
-      });
-    }
-    gratisPaths = nextCollections
-  }
-  response.redirect(303, 'success');
+        db.collection("users")
+        .doc(doc.id)
+        .update({ "goals&routines": arrs });
+      }
+    });
+    res.redirect(303, 'success');
+  });
 });
 
 export const CopyDocDataToChild = functions.https.onRequest((request, response) => {
@@ -941,34 +946,33 @@ exports.RecursiveDelete = functions
 find the user with email id
 */
 exports.FindUserDoc = functions.https.onCall(async (data, context) => {
-    // Grab the text parameter.
-    let emailId = data.emailId;
-    var emailId1 = emailId.toLowerCase();
-    var email = emailId1.split("@");
-    email[0] = email[0].split(".").join("");
-    email[0] = email[0].concat("@");
-    var emailId_final = email[0].concat(email[1]);
-    console.log(emailId1);
-    console.log(emailId_final);
-    var userDetails = {id:""};
-    let users = db.collection('users');
-    let userData = users.where('email_id', '==', emailId_final );
-    await userData.get()
-        .then(snapshot => {
-            if (snapshot.empty) {
-                console.log('No matching documents.');
-                //return "User Not Found";
-            }
-            snapshot.forEach(doc => {
-                userDetails.id = doc.id
-                console.log(userDetails);
-            });
-        })
-        .catch(err => {
-        console.log('Error getting documents', err);
-        });
-
-    return userDetails;
+  // Grab the text parameter.
+  let emailId = data.emailId;
+  var emailId1 = emailId.toLowerCase();
+  var email = emailId1.split("@");
+  email[0] = email[0].split(".").join("");
+  email[0] = email[0].concat("@");
+  var emailId_final = email[0].concat(email[1]);
+  console.log(emailId1);
+  console.log(emailId_final);
+  var userDetails = {id:""};
+  let users = db.collection('users');
+  let userData = users.where('email_id', '==', emailId_final );
+  await userData.get()
+  .then(snapshot => {
+    if (snapshot.empty) {
+      console.log('No matching documents.');
+      //return "User Not Found";
+    }
+    snapshot.forEach(doc => {
+      userDetails.id = doc.id
+      console.log(userDetails);
+    });
+  })
+  .catch(err => {
+    console.log('Error getting documents', err);
+  });
+  return userDetails;
 });
 
 exports.LogGRHistory = functions.https.onRequest((req, res) => {
@@ -984,7 +988,7 @@ exports.LogGRHistory = functions.https.onRequest((req, res) => {
       var data = doc.data()['goals&routines']
       if (data != null) {
         let usr: {"goals&routines": {id: string, title: string, is_complete: string}[], user_id: string} =
-         {"goals&routines": [], user_id: doc.id}
+        {"goals&routines": [], user_id: doc.id}
         data.forEach((gr: {id: string, title: string, is_complete: string}) => {
           usr["goals&routines"].push(
             {
@@ -1028,268 +1032,109 @@ exports.LogGRHistory = functions.https.onRequest((req, res) => {
   });
 });
 
-/**
-Copy structure of the user
-*/
+exports.UpdateGRIsDisplayed = functions.https.onRequest((req, res) => {
+  let CurrentDate: Date = new Date(new Date().toLocaleString('en-US', {
+    timeZone: "America/Los_Angeles"
+  }));
+  CurrentDate.setHours(0,0,0,0);
 
-/*
-exports.CopyStructureFromUser = functions.https.onCall(async (data, context) => {
-    // Grab the text parameter.
-    var userId = "7R6hAVmDrNutRkG3sVRy";
-    var userDetails;
-    let users = db.collection('users').doc(userId);
-    await users.get().then(snapshot => {
-            if (!snapshot.exists) {
-                console.log('No matching documents.');
-                return "User Not Found";
-            } else {
-                userDetails = snapshot.data();
-                var userData = userDetails;
-                console.log(userDetails);
-                for (let key in userDetails) { 
-                    if (userDetails.hasOwnProperty(key)) 
-                    { 
-                        //var value = userDetails[key]; 
-                        //console.log(key, value);
-                        if (key == "goals&routines")
-                        {
-                            userData[key] = [];
-                            
-                        } else if (key == "about_me"){
-                            
-                            var temp = userDetails[key];
-                            for (let key1 in temp) {
-                                if (temp.hasOwnProperty(key1)) 
-                                {
-                                    temp[key1] = "";
-                                }
-                            }
-                            userData[key] = temp;
-                            
-                        } else {
-                            userData[key] = "";
-                        }
-                    } 
+  db.collection("users").get()
+  .then((snapshot) =>
+  {
+    snapshot.forEach(doc => {
+      if (doc.data()["goals&routines"] != null) {
+        let arrs = doc.data()["goals&routines"];
+        arrs.forEach((gr: {
+          start_day_and_time: string,
+          repeat_occurences: string,
+          is_displayed_today: boolean,
+          repeat_frequency: string,
+          repeat_ends: string,
+          repeat_ends_on: string,
+          repeat_every: string,
+          repeat_week_days:  {[index: string]: string},
+          repeat: boolean,
+        }) => {
+          let startDate = new Date(new Date(gr["start_day_and_time"]).toLocaleString('en-US', {
+            timeZone: "America/Los_Angeles"
+          }));
+          startDate.setHours(0,0,0,0);
+          let isDisplayedTodayCalculated: boolean = false;
+          let repeatOccurences = parseInt(gr["repeat_occurences"]);
+          let repeatEvery = parseInt(gr["repeat_every"]);
+          let repeatEnds = gr["repeat_ends"];
+          let repeatEndsOn: Date = new Date(new Date(gr["repeat_ends_on"]).toLocaleString('en-US', {
+            timeZone: "America/Los_Angeles"
+          }));
+          repeatEndsOn.setHours(0,0,0,0);
+          let repeatFrequency: string = gr["repeat_frequency"];
+          let repeatWeekDays: number[] = [];
+          if (gr["repeat_week_days"] != null) {
+            Object.keys(gr["repeat_week_days"])
+            .forEach( (k: string) => {
+              if (gr["repeat_week_days"][k] != "") {
+                repeatWeekDays.push(parseInt(k));
+              }
+            });
+          }
+
+          if (!gr.repeat) {
+            isDisplayedTodayCalculated = CurrentDate.getTime() - startDate.getTime() == 0
+          } else {
+            if (CurrentDate >= startDate) {
+              if (repeatEnds == "On") {
+              } else if (repeatEnds == "After") {
+                if (repeatFrequency == "DAY") {
+                  repeatEndsOn = new Date(new Date(startDate).toLocaleString('en-US', {
+                    timeZone: "America/Los_Angeles"
+                  }));
+                  repeatEndsOn.setDate(startDate.getDate() + (repeatOccurences-1)*repeatEvery);
+                } else if (repeatFrequency == "WEEK"){
+                  repeatEndsOn = new Date(new Date(startDate).toLocaleString('en-US', {
+                    timeZone: "America/Los_Angeles"
+                  }));
+                  repeatEndsOn.setDate(startDate.getDate() + (repeatOccurences-1)*7*repeatEvery);
+                } else if (repeatFrequency == "MONTH"){
+                  repeatEndsOn = new Date(new Date(startDate).toLocaleString('en-US', {
+                    timeZone: "America/Los_Angeles"
+                  }));
+                  repeatEndsOn.setMonth(startDate.getMonth() + (repeatOccurences-1)*repeatEvery);
+                } else if (repeatFrequency == "YEAR"){
+                  repeatEndsOn = new Date(new Date(startDate).toLocaleString('en-US', {
+                    timeZone: "America/Los_Angeles"
+                  }));
+                  repeatEndsOn.setFullYear(startDate.getFullYear() + (repeatOccurences-1)*repeatEvery);
                 }
-                
-                console.log(userData);
-            }
-        })
-        .catch(err => {
-        console.log('Error getting documents', err);
-        });
+              } else if (repeatEnds == "Never") {
+                repeatEndsOn = CurrentDate;
+              }
 
-    return userDetails;
-});
-*/
-
-/**
-Save details of the photos
-*/
-/*
-exports.SavePhotoDetails = functions.https.onCall(async (data, context) => {
-    // Grab the text parameter.
-    let userId = data.userId;
-    let photo_id = data.photoId;
-    let desc = data.desc;
-    let notes = data.notes;
-    console.log(userId);
-    var userDetails = {photo_id:"", description:"", notes:""};
-    let users = db.collection('users').doc(userId);
-    let userData = users.collection('photo').doc(photo_id);
-    await users.get()
-        .then(async snapshot => {
-            if (!snapshot.exists) {
-                console.log('No matching documents.');
-            }else {
-                await userData.get()
-                    .then(snapshot => {
-                        if (!snapshot.exists) {
-                            console.log('No matching photos.');
-                            userDetails["photo_id"] = photo_id;
-                            userDetails["description"] = desc;
-                            userDetails["notes"] = notes;
-                            userData.set(userDetails).then()
-                            .catch(err => {
-                            console.log('Error getting documents', err);
-                            });
-                        } else {
-                            console.log(snapshot.data());
-                            userDetails = snapshot.data();
-                            userDetails["photo_id"] = photo_id;
-                            userDetails["description"] = desc;
-                            userDetails["notes"] = notes;
-                            userData.set(userDetails).then()
-                            .catch(err => {
-                            console.log('Error getting documents', err);
-                            });
-                        }
-
-                    })
-                    .catch(err => {
-                    console.log('Error getting documents', err);
-                    });
-            }
-        })
-    return userDetails;
-});
-*/
-
-/**
-Get details of the photos
-*/
-/*
-exports.GetPhotoDetails = functions.https.onCall(async (data, context) => {
-    // Grab the text parameter.
-    let userId = data.userId;
-    let photo_id = data.photoId;
-    var userDetails = {photo_id:"", description:"", notes:""};
-    let users = db.collection('users').doc(userId);
-    let userData = users.collection('photo').doc(photo_id);
-    await userData.get()
-        .then(snapshot => {
-            if (!snapshot.exists) {
-                console.log('No matching photos.');
-                            
-            } else {
-                console.log(snapshot.data());
-                userDetails = snapshot.data();
-            }
-        })
-        .catch(err => {
-            console.log('Error getting documents', err);
-        });
-    return userDetails;
-});
-*/
-
-/**
-copy data from one user to another
-*/
-/*
-exports.CopyUserData = functions.https.onCall(async (data, context) => {
-    // Grab the text parameter.
-    let copy_from_user = data.copy_from_user;
-    let copy_to_user = data.copy_to_user;
-    var userDetails = {};
-    var userData = {};
-    let users = db.collection('users');
-    let sourceUser = users.doc(copy_from_user);
-    let sourceUserGR = sourceUser.collection('goals&routines');
-    let destUser = users.doc(copy_to_user);
-    let destUserGR = destUser.collection('goals&routines');
-    await sourceUser.get()
-        .then(async snapshot => {
-            if (!snapshot.exists) {
-                console.log('No matching documents.');
-                return "User Not Found";
-            } else {
-                userDetails = snapshot.data();
-                for (let key in userDetails) { 
-                    if (userDetails.hasOwnProperty(key)) 
-                    { 
-                        if (key == "goals&routines")
-                        {
-                            userData[key] = userDetails[key]
-                            
-                        }  else {
-
-                            continue;
-                        }
-                    } 
+              if (CurrentDate <= repeatEndsOn) {
+                if (repeatFrequency == "DAY") {
+                  isDisplayedTodayCalculated = Math.floor((CurrentDate.getTime() - startDate.getTime())/(24*3600*1000)) % repeatEvery == 0;
+                } else if (repeatFrequency == "WEEK"){
+                  isDisplayedTodayCalculated = repeatWeekDays.includes(CurrentDate.getDay()) && Math.floor((CurrentDate.getTime() - startDate.getTime())/(7*24*3600*1000)) % repeatEvery == 0;
+                } else if (repeatFrequency == "MONTH"){
+                  isDisplayedTodayCalculated = (CurrentDate.getDate() == startDate.getDate()) &&
+                  ((CurrentDate.getFullYear() - startDate.getFullYear())*12 + CurrentDate.getMonth() - startDate.getMonth()) % repeatEvery == 0;
+                } else if (repeatFrequency == "YEAR"){
+                  isDisplayedTodayCalculated = (startDate.getDate() == CurrentDate.getDate()) &&
+                  (CurrentDate.getMonth() == startDate.getMonth()) &&
+                  (CurrentDate.getFullYear() - startDate.getFullYear()) % repeatEvery == 0;
                 }
-                await destUser.set(userData).then()
-                    .catch(err => {
-                    console.log('Error getting documents', err);
-                    });
-                await sourceUserGR.get()
-                    .then(snap => {
-                        snap.forEach(async doc => {
-                        var id = doc.id;
-                        var userDetailsGR = doc.data();
-                        await destUserGR.doc(id).set(userDetailsGR).then()
-                            .catch(err => {
-                                console.log('Error getting documents', err);
-                            });
-
-                        await sourceUserGR.doc(id).collection('actions&tasks').get()
-                            .then(snapAT => {
-                                console.log(snapAT.size);
-                                snapAT.forEach(async docu => {
-                                var atid = docu.id;
-                                var userDetailsGR = docu.data();
-                                await destUserGR.doc(id).collection('actions&tasks').doc(atid).set(userDetailsGR).then()
-                                .catch(err => {
-                                    console.log('Error getting documents', err);
-                                });
-                                });
-                            })
-                            .catch(err => {
-                                    console.log('Error getting documents', err);
-                            });
-                        });
-                    })
-                    .catch(err => {
-                        console.log('Error getting documents', err);
-                    });
+              }
             }
-        })
-        .catch(err => {
-        console.log('Error getting documents', err);
+          }
+          gr["is_displayed_today"] = isDisplayedTodayCalculated
         });
-
-    return userDetails;
-});
-*/
-
-/**
-List Icons in Storage
-*/
-/*
-exports.ListIconsFromStorage = functions.https.onCall(async (data, context) => {
-    // Grab the text parameter.
-    const storage = new Storage();
-    var options = {
-      prefix: "Icons/",
-    };
-    var bucketName = "project-caitlin-c71a9.appspot.com";
-    var [files] = await storage.bucket(bucketName).getFiles(options);
-    
-    //var [url] = await storage
-    //                .bucket(bucketName)
-    //                .file("Icons/alarm-clock.svg")
-    //              .getMetadata();
-
-    //        console.log(url.metadata.firebaseStorageDownloadTokens);
-    var tokens = new Array();
-    var filenames = new Array();
-    console.log('Files:');
-    files.forEach(async file => {
-            if (file.name != "Icons/") {
-                //console.log(file.name);
-                filenames.push(file.name);
-            }
-        
+        db.collection("users")
+        .doc(doc.id)
+        .update({ "goals&routines": arrs });
+      }
     });
-    for(var name of filenames){
-        var [meta] = await storage
-                    .bucket(bucketName)
-                    .file(name)
-                    .getMetadata();
-        //console.log(meta.metadata.firebaseStorageDownloadTokens);
-        var filename = name.replace("/", "%2F");
-        var url = "https://firebasestorage.googleapis.com/v0/b/project-caitlin-c71a9.appspot.com/o/" ;
-        url += filename;
-        url += "?alt=media&token=";
-        url += meta.metadata.firebaseStorageDownloadTokens;
-        console.log(url);
-        tokens.push(meta.metadata.firebaseStorageDownloadTokens);
-    }
-    
-    
-    return tokens;
+    res.redirect(303, 'success');
+  });
 });
-*/
 
 function getCurrentDateTimeUTC() {
   const today = new Date()

@@ -8,4 +8,5 @@ typings/
 node_modules/
 ServiceAccountKey.json
 ServiceAccountMySpace.json
+ServiceAccountMyLife.json
 Caitlin-Backend.zip
