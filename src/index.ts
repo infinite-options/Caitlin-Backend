@@ -245,7 +245,8 @@ export const StartTaskStep = functions.https.onRequest((request, response) => {
     .then(doc => {
       if (!doc.exists) {
         console.log('No such document!');
-      } else {
+      } 
+      else {
         stepNumber = parseInt(stepNumberReq)
         const steps = doc.data()!;
         steps['instructions&steps'][stepNumber].datetime_started = getCurrentDateTimeUTC()
@@ -260,6 +261,7 @@ export const StartTaskStep = functions.https.onRequest((request, response) => {
   response.redirect(303, 'success');
 });
 
+/*
 export const StartGoalOrRoutine = functions.https.onRequest((request, response) => {
   // Grab the text parameter.
   const userId = request.get('userId')?.toString()
@@ -302,7 +304,60 @@ export const StartGoalOrRoutine = functions.https.onRequest((request, response) 
   }
   response.redirect(303, 'success');
 });
+*/
 
+exports.StartGoalOrRoutine = functions.https.onCall(async (data, context) => {
+    var _a, _b, _c, _d;
+
+    //Grab the text parameter.
+    const userId = (_a = data.userId) === null || _a === void 0 ? void 0 : _a.toString();
+    const routineId = (_b = data.routineId) === null || _b === void 0 ? void 0 : _b.toString();
+    const routineNumberReq = (_d = data.taskNumber) === null || _d === void 0 ? void 0 : _d.toString();
+    let routineNumber;
+
+    if (userId && routineId && routineNumberReq) {
+        const user = db.collection('users').doc(userId);
+
+        //Using a promise here since 'onCall' is async.
+        return user.get()
+            .then(doc => {
+                if (!doc.exists) {
+                    console.log('No such document!');
+                    return 404;
+                }
+                else {
+                    routineNumber = parseInt(routineNumberReq);
+                    const routines = doc.data();
+                    // console.log('Document data:', doc.data());
+                    if (routines['goals&routines'].length>routineNumber && routines['goals&routines'][routineNumber].id === routineId) {
+                        routines['goals&routines'][routineNumber].is_in_progress = true;
+                        routines['goals&routines'][routineNumber].datetime_started = getCurrentDateTimeUTC();
+                        user.set(routines).then().catch();
+                        console.log('Success');
+                        return 200;
+                    }
+                    else {
+                        for (let i = 0; i < routines['goals&routines'].length; i++) {
+                            if (routines['goals&routines'][i].id === routineId) {
+                                routines['goals&routines'][i].is_in_progress = true;
+                                routines['goals&routines'][i].datetime_started = getCurrentDateTimeUTC();
+                                user.set(routines).then().catch();
+                                console.log('Success');
+                                return 200;
+                            }
+                        }
+                    }
+                  return 404;
+                }
+            })
+            .catch(err => {
+            console.log('Error getting document', err);
+            return 400;
+        });
+    }
+});
+
+/*
 export const StartActionOrTask = functions.https.onRequest((request, response) => {
   // Grab the text parameter.
   const userId = request.get('userId')?.toString()
@@ -346,7 +401,60 @@ export const StartActionOrTask = functions.https.onRequest((request, response) =
   }
   response.redirect(303, 'success');
 });
+*/
 
+exports.StartActionOrTask = functions.https.onCall( async (data, context) => {
+    var _a, _b, _c, _d;
+
+    //Grab the text parameter.
+    const userId = (_a = data.userId) === null || _a === void 0 ? void 0 : _a.toString();
+    const routineId = (_b = data.routineId) === null || _b === void 0 ? void 0 : _b.toString();
+    const taskId = (_c = data.taskId) === null || _c === void 0 ? void 0 : _c.toString();
+    const taskNumberReq = (_d = data.taskNumber) === null || _d === void 0 ? void 0 : _d.toString();
+    let taskNumber;
+
+    if (userId && routineId && taskId && taskNumberReq) {
+        const routine = db.collection('users').doc(userId).collection('goals&routines').doc(routineId);
+
+        //Using a promise here since 'onCall' is async.
+        return routine.get()
+          .then(doc => {
+              if (!doc.exists) {
+                  console.log('No such document!');
+                  return 404;
+              }
+                else {
+                    taskNumber = parseInt(taskNumberReq);
+                    const tasks = doc.data();
+                    if (tasks['actions&tasks'].length>taskNumber && tasks['actions&tasks'][taskNumber].id === taskId) {
+                        tasks['actions&tasks'][taskNumber].is_in_progress = true;
+                        tasks['actions&tasks'][taskNumber].datetime_started = getCurrentDateTimeUTC();
+                        routine.set(tasks).then().catch();
+                        console.log('Success');
+                        return 200;
+                    }
+                    else {
+                        for (let i = 0; i < tasks['actions&tasks'].length; i++) {
+                            if (tasks['actions&tasks'][i].id === taskId) {
+                                tasks['actions&tasks'][i].is_in_progress = true;
+                                tasks['actions&tasks'][i].datetime_started = getCurrentDateTimeUTC();
+                                routine.set(tasks).then().catch();
+                                console.log('Success');
+                                return 200;
+                            }
+                        }
+                    }
+                  return 404;
+                }
+            })
+            .catch(err => {
+            console.log('Error getting document', err);
+            return 400;
+        });
+    }
+});
+
+/*
 export const StartInstructionOrStep = functions.https.onRequest((request, response) => {
   // Grab the text parameter.
   const userId = request.get('userId')?.toString()
@@ -380,7 +488,46 @@ export const StartInstructionOrStep = functions.https.onRequest((request, respon
   }
   response.redirect(303, 'success');
 });
+*/
 
+export const StartInstructionOrStep = functions.https.onCall( async (data, context) => {
+  var _a, _b, _c, _d;
+
+  // Grab the text parameter.
+  const userId = (_a = data.userId) === null || _a === void 0 ? void 0 : _a.toString();
+  const routineId = (_b = data.routineId) === null || _b === void 0 ? void 0 : _b.toString();
+  const taskId = (_c = data.taskId) === null || _c === void 0 ? void 0 : _c.toString();
+  const stepNumberReq = (_d = data.stepNumber) === null || _d === void 0 ? void 0 : _d.toString();
+  let stepNumber;
+
+  if (userId && routineId && taskId && stepNumberReq) {
+    const task = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks').doc(taskId);
+    
+    //Using a promise here since 'onCall' is async.
+    return task.get()
+      .then(doc => {
+        if (!doc.exists) {
+          console.log('No such document!');
+          return 404;
+        } 
+        else {
+          stepNumber = parseInt(stepNumberReq)
+          const steps = doc.data();
+          steps['instructions&steps'][stepNumber].is_in_progress = true;
+          steps['instructions&steps'][stepNumber].datetime_started = getCurrentDateTimeUTC()
+          task.set(steps).then().catch();
+          console.log('Success');
+          return 200;
+        }
+      })
+      .catch(err => {
+        console.log('Error getting document', err);
+        return 400;
+      });
+  }
+});
+
+/*
 export const CompleteInstructionOrStep = functions.https.onRequest((request, response) => {
   // Grab the text parameter.
   const userId = request.get('userId')?.toString()
@@ -414,7 +561,49 @@ export const CompleteInstructionOrStep = functions.https.onRequest((request, res
   }
   response.redirect(303, 'success');
 });
+*/
 
+exports.CompleteInstructionOrStep = functions.https.onCall(async (data, context) => {
+    var _a, _b, _c, _d;
+    
+
+    //Grab the text parameter.
+    const userId = (_a = data.userId) === null || _a === void 0 ? void 0 : _a.toString();
+    const routineId = (_b = data.routineId) === null || _b === void 0 ? void 0 : _b.toString();
+    const taskId = (_c = data.taskId) === null || _c === void 0 ? void 0 : _c.toString();
+    const stepNumberReq = (_d = data.stepNumber) === null || _d === void 0 ? void 0 : _d.toString();
+    let stepNumber;
+    
+    if (userId && routineId && taskId && stepNumberReq) {
+        console.log('First test passed...');
+        const task = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks').doc(taskId);
+
+        //Using a promise here since 'onCall' is async.
+        return task.get()
+            .then(doc => {
+                if (!doc.exists) {
+                    console.log('No such document!');
+                    return 404;
+                }
+                else {
+                    stepNumber = parseInt(stepNumberReq);
+                    const steps = doc.data();
+                    steps['instructions&steps'][stepNumber].is_in_progress = false;
+                    steps['instructions&steps'][stepNumber].is_complete = true;
+                    steps['instructions&steps'][stepNumber].datetime_completed = getCurrentDateTimeUTC();
+                    task.set(steps).then().catch();
+                    console.log('Success');
+                    return 200;
+                }
+            })
+            .catch(err => {
+            console.log('Error getting document', err);
+            return 400;
+        });
+    }
+});
+
+/*
 export const CompleteActionOrTask = functions.https.onRequest((request, response) => {
   // Grab the text parameter.
   const userId = request.get('userId')?.toString()
@@ -458,7 +647,63 @@ export const CompleteActionOrTask = functions.https.onRequest((request, response
   }
   response.redirect(303, 'success');
 });
+*/
 
+exports.CompleteActionOrTask = functions.https.onCall( async (data, context) => {
+    var _a, _b, _c, _d;
+     
+    //Grab the text parameter.
+    const userId = (_a = data.userId) === null || _a === void 0 ? void 0 : _a.toString();
+    const routineId = (_b = data.routineId) === null || _b === void 0 ? void 0 : _b.toString();
+    const taskId = (_c = data.taskId) === null || _c === void 0 ? void 0 : _c.toString();
+    const taskNumberReq = (_d = data.taskNumber) === null || _d === void 0 ? void 0 : _d.toString();
+    let taskNumber;
+
+    if (userId && routineId && taskId && taskNumberReq) {
+        const routine = db.collection('users').doc(userId).collection('goals&routines').doc(routineId);
+
+        //Using a promise here since 'onCall' is async.
+        return routine.get()
+            .then(doc => {
+                if (!doc.exists) {
+                    console.log('No such document!');
+                    return 404;
+                }
+                else {
+                    taskNumber = parseInt(taskNumberReq);
+                    const tasks = doc.data();
+                    if (tasks['actions&tasks'].length>taskNumber && tasks['actions&tasks'][taskNumber].id === taskId) {
+                        tasks['actions&tasks'][taskNumber].is_in_progress = false;
+                        tasks['actions&tasks'][taskNumber].is_complete = true;
+                        tasks['actions&tasks'][taskNumber].datetime_completed = getCurrentDateTimeUTC();
+                        routine.set(tasks).then().catch();
+                        console.log('Success');
+                        return 200;
+                    }
+                    else {
+                        console.log('Will iterate now...');
+                        for (let i = 0; i < tasks['actions&tasks'].length; i++) {
+                            if (tasks['actions&tasks'][i].id === taskId) {
+                                tasks['actions&tasks'][i].is_in_progress = false;
+                                tasks['actions&tasks'][i].is_complete = true;
+                                tasks['actions&tasks'][i].datetime_completed = getCurrentDateTimeUTC();
+                                routine.set(tasks).then().catch();
+                                console.log('Success');
+                                return 200;
+                            }
+                        }
+                        return 404;
+                    }
+                }
+            })
+            .catch(err => {
+            console.log('Error getting document', err);
+            return 400;
+        });
+    }
+});
+
+/*
 export const CompleteGoalOrRoutine = functions.https.onRequest((request, response) => {
   // Grab the text parameter.
   const userId = request.get('userId')?.toString()
@@ -500,6 +745,58 @@ export const CompleteGoalOrRoutine = functions.https.onRequest((request, respons
     });
   }
   response.redirect(303, 'success');
+});
+*/
+
+exports.CompleteGoalOrRoutine = functions.https.onCall( async (data, context) => { 
+    var _a, _b, _c;
+
+    //Grab the text parameter.
+    const userId = (_a = data.userId) === null || _a === void 0 ? void 0 : _a.toString();
+    const routineId = (_b = data.routineId) === null || _b === void 0 ? void 0 : _b.toString();
+    const routineNumberReq = (_c = data.routineNumber) === null || _c === void 0 ? void 0 : _c.toString();
+    let routineNumber;
+    
+    if (userId && routineId && routineNumberReq) {
+        const user = db.collection('users').doc(userId);
+
+        //Using a promise here since 'onCall' is async.
+        return user.get()
+            .then(doc => {
+                if (!doc.exists) {
+                    console.log('No such document!');
+                    return 404;
+                }
+                else {
+                    routineNumber = parseInt(routineNumberReq);
+                    const routines = doc.data();
+                    if (routines['goals&routines']>routineNumber && routines['goals&routines'][routineNumber].id === routineId) {
+                        routines['goals&routines'][routineNumber].is_in_progress = false;
+                        routines['goals&routines'][routineNumber].is_complete = true;
+                        routines['goals&routines'][routineNumber].datetime_completed = getCurrentDateTimeUTC();
+                        user.set(routines).then().catch();
+                        return 200;
+                    }
+                    else {
+                        for (let i = 0; i < routines['goals&routines'].length; i++) {
+                            if (routines['goals&routines'][i].id === routineId) {
+                                routines['goals&routines'][i].is_in_progress = false;
+                                routines['goals&routines'][i].is_complete = true;
+                                routines['goals&routines'][i].datetime_completed = getCurrentDateTimeUTC();
+                                user.set(routines).then().catch();
+                                console.log('Success');
+                                return 200;
+                            }
+                        }
+                        return 404;
+                    }
+                }
+            })
+            .catch(err => {
+            console.log('Error getting document', err);
+            return 400;
+        });
+    }
 });
 
 export const GRUserNotificationSetToTrue = functions.https.onRequest((request, response) => {
