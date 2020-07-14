@@ -308,12 +308,11 @@ export const StartGoalOrRoutine = functions.https.onRequest((request, response) 
 */
 
 exports.StartGoalOrRoutine = functions.https.onCall(async (data, context) => {
-    var _a, _b, _c, _d;
 
     //Grab the text parameter.
-    const userId = (_a = data.userId) === null || _a === void 0 ? void 0 : _a.toString();
-    const routineId = (_b = data.routineId) === null || _b === void 0 ? void 0 : _b.toString();
-    const routineNumberReq = (_d = data.taskNumber) === null || _d === void 0 ? void 0 : _d.toString();
+    const userId = data.userId?.toString();
+    const routineId = data.routineId?.toString();
+    const routineNumberReq = data.taskNumber?.toString();
     let routineNumber;
 
     if (userId && routineId && routineNumberReq) {
@@ -328,7 +327,7 @@ exports.StartGoalOrRoutine = functions.https.onCall(async (data, context) => {
                 }
                 else {
                     routineNumber = parseInt(routineNumberReq);
-                    const routines = doc.data();
+                    const routines = doc.data()!;
                     // console.log('Document data:', doc.data());
                     if (routines['goals&routines'].length>routineNumber && routines['goals&routines'][routineNumber].id === routineId) {
                         routines['goals&routines'][routineNumber].is_in_progress = true;
@@ -355,6 +354,9 @@ exports.StartGoalOrRoutine = functions.https.onCall(async (data, context) => {
             console.log('Error getting document', err);
             return 400;
         });
+    }
+    else{
+      return 400;
     }
 });
 
@@ -405,13 +407,12 @@ export const StartActionOrTask = functions.https.onRequest((request, response) =
 */
 
 exports.StartActionOrTask = functions.https.onCall( async (data, context) => {
-    var _a, _b, _c, _d;
 
     //Grab the text parameter.
-    const userId = (_a = data.userId) === null || _a === void 0 ? void 0 : _a.toString();
-    const routineId = (_b = data.routineId) === null || _b === void 0 ? void 0 : _b.toString();
-    const taskId = (_c = data.taskId) === null || _c === void 0 ? void 0 : _c.toString();
-    const taskNumberReq = (_d = data.taskNumber) === null || _d === void 0 ? void 0 : _d.toString();
+    const userId = data.userId?.toString();
+    const routineId = data.routineId?.toString();
+    const taskId = data.taskId?.toString();
+    const taskNumberReq = data.taskNumber?.toString();
     let taskNumber;
 
     if (userId && routineId && taskId && taskNumberReq) {
@@ -426,7 +427,7 @@ exports.StartActionOrTask = functions.https.onCall( async (data, context) => {
               }
                 else {
                     taskNumber = parseInt(taskNumberReq);
-                    const tasks = doc.data();
+                    const tasks = doc.data()!;
                     if (tasks['actions&tasks'].length>taskNumber && tasks['actions&tasks'][taskNumber].id === taskId) {
                         tasks['actions&tasks'][taskNumber].is_in_progress = true;
                         tasks['actions&tasks'][taskNumber].datetime_started = getCurrentDateTimeUTC();
@@ -452,6 +453,9 @@ exports.StartActionOrTask = functions.https.onCall( async (data, context) => {
             console.log('Error getting document', err);
             return 400;
         });
+    }
+    else{
+      return 400;
     }
 });
 
@@ -492,13 +496,12 @@ export const StartInstructionOrStep = functions.https.onRequest((request, respon
 */
 
 export const StartInstructionOrStep = functions.https.onCall( async (data, context) => {
-  var _a, _b, _c, _d;
 
   // Grab the text parameter.
-  const userId = (_a = data.userId) === null || _a === void 0 ? void 0 : _a.toString();
-  const routineId = (_b = data.routineId) === null || _b === void 0 ? void 0 : _b.toString();
-  const taskId = (_c = data.taskId) === null || _c === void 0 ? void 0 : _c.toString();
-  const stepNumberReq = (_d = data.stepNumber) === null || _d === void 0 ? void 0 : _d.toString();
+  const userId = data.userId?.toString();
+  const routineId = data.routineId?.toString();
+  const taskId = data.taskId?.toString();
+  const stepNumberReq = data.stepNumber?.toString();
   let stepNumber;
 
   if (userId && routineId && taskId && stepNumberReq) {
@@ -513,7 +516,7 @@ export const StartInstructionOrStep = functions.https.onCall( async (data, conte
         } 
         else {
           stepNumber = parseInt(stepNumberReq)
-          const steps = doc.data();
+          const steps = doc.data()!;
           steps['instructions&steps'][stepNumber].is_in_progress = true;
           steps['instructions&steps'][stepNumber].datetime_started = getCurrentDateTimeUTC()
           task.set(steps).then().catch();
@@ -525,6 +528,9 @@ export const StartInstructionOrStep = functions.https.onCall( async (data, conte
         console.log('Error getting document', err);
         return 400;
       });
+  }
+  else{
+    return 400;
   }
 });
 
@@ -565,14 +571,12 @@ export const CompleteInstructionOrStep = functions.https.onRequest((request, res
 */
 
 exports.CompleteInstructionOrStep = functions.https.onCall(async (data, context) => {
-    var _a, _b, _c, _d;
-    
 
     //Grab the text parameter.
-    const userId = (_a = data.userId) === null || _a === void 0 ? void 0 : _a.toString();
-    const routineId = (_b = data.routineId) === null || _b === void 0 ? void 0 : _b.toString();
-    const taskId = (_c = data.taskId) === null || _c === void 0 ? void 0 : _c.toString();
-    const stepNumberReq = (_d = data.stepNumber) === null || _d === void 0 ? void 0 : _d.toString();
+    const userId = data.userId?.toString();
+    const routineId = data.routineId?.toString();
+    const taskId = data.taskId?.toString();
+    const stepNumberReq = data.stepNumber?.toString();
     let stepNumber;
     
     if (userId && routineId && taskId && stepNumberReq) {
@@ -588,7 +592,7 @@ exports.CompleteInstructionOrStep = functions.https.onCall(async (data, context)
                 }
                 else {
                     stepNumber = parseInt(stepNumberReq);
-                    const steps = doc.data();
+                    const steps = doc.data()!;
                     steps['instructions&steps'][stepNumber].is_in_progress = false;
                     steps['instructions&steps'][stepNumber].is_complete = true;
                     steps['instructions&steps'][stepNumber].datetime_completed = getCurrentDateTimeUTC();
@@ -601,6 +605,9 @@ exports.CompleteInstructionOrStep = functions.https.onCall(async (data, context)
             console.log('Error getting document', err);
             return 400;
         });
+    }
+    else{
+      return 400;
     }
 });
 
@@ -651,13 +658,12 @@ export const CompleteActionOrTask = functions.https.onRequest((request, response
 */
 
 exports.CompleteActionOrTask = functions.https.onCall( async (data, context) => {
-    var _a, _b, _c, _d;
-     
+  
     //Grab the text parameter.
-    const userId = (_a = data.userId) === null || _a === void 0 ? void 0 : _a.toString();
-    const routineId = (_b = data.routineId) === null || _b === void 0 ? void 0 : _b.toString();
-    const taskId = (_c = data.taskId) === null || _c === void 0 ? void 0 : _c.toString();
-    const taskNumberReq = (_d = data.taskNumber) === null || _d === void 0 ? void 0 : _d.toString();
+    const userId = data.userId?.toString();
+    const routineId = data.routineId?.toString();
+    const taskId = data.taskId?.toString();
+    const taskNumberReq = data.taskNumber?.toString();
     let taskNumber;
 
     if (userId && routineId && taskId && taskNumberReq) {
@@ -672,7 +678,7 @@ exports.CompleteActionOrTask = functions.https.onCall( async (data, context) => 
                 }
                 else {
                     taskNumber = parseInt(taskNumberReq);
-                    const tasks = doc.data();
+                    const tasks = doc.data()!;
                     if (tasks['actions&tasks'].length>taskNumber && tasks['actions&tasks'][taskNumber].id === taskId) {
                         tasks['actions&tasks'][taskNumber].is_in_progress = false;
                         tasks['actions&tasks'][taskNumber].is_complete = true;
@@ -701,6 +707,9 @@ exports.CompleteActionOrTask = functions.https.onCall( async (data, context) => 
             console.log('Error getting document', err);
             return 400;
         });
+    }
+    else{
+      return 400;
     }
 });
 
@@ -750,12 +759,11 @@ export const CompleteGoalOrRoutine = functions.https.onRequest((request, respons
 */
 
 exports.CompleteGoalOrRoutine = functions.https.onCall( async (data, context) => { 
-    var _a, _b, _c;
-
+ 
     //Grab the text parameter.
-    const userId = (_a = data.userId) === null || _a === void 0 ? void 0 : _a.toString();
-    const routineId = (_b = data.routineId) === null || _b === void 0 ? void 0 : _b.toString();
-    const routineNumberReq = (_c = data.routineNumber) === null || _c === void 0 ? void 0 : _c.toString();
+    const userId = data.userId?.toString();
+    const routineId = data.routineId?.toString();
+    const routineNumberReq = data.routineNumber?.toString();
     let routineNumber;
     
     if (userId && routineId && routineNumberReq) {
@@ -770,7 +778,7 @@ exports.CompleteGoalOrRoutine = functions.https.onCall( async (data, context) =>
                 }
                 else {
                     routineNumber = parseInt(routineNumberReq);
-                    const routines = doc.data();
+                    const routines = doc.data()!;
                     if (routines['goals&routines']>routineNumber && routines['goals&routines'][routineNumber].id === routineId) {
                         routines['goals&routines'][routineNumber].is_in_progress = false;
                         routines['goals&routines'][routineNumber].is_complete = true;
@@ -797,6 +805,9 @@ exports.CompleteGoalOrRoutine = functions.https.onCall( async (data, context) =>
             console.log('Error getting document', err);
             return 400;
         });
+    }
+    else{
+      return 400;
     }
 });
 
