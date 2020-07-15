@@ -4,7 +4,7 @@ import * as admin from 'firebase-admin';
 const firebase_tools = require('firebase-tools');
 //const serviceAccount = require('../ServiceAccount.json');
 //const serviceAccount = require('../ServiceAccountMyLife.json');
-const serviceAccount = require('../ServiceAccountMySpace.json');
+const serviceAccount = require('../ServiceAccountKey.json');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
