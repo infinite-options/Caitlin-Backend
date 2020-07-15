@@ -246,7 +246,7 @@ export const StartTaskStep = functions.https.onRequest((request, response) => {
     .then(doc => {
       if (!doc.exists) {
         console.log('No such document!');
-      } 
+      }
       else {
         stepNumber = parseInt(stepNumberReq)
         const steps = doc.data()!;
@@ -506,14 +506,14 @@ export const StartInstructionOrStep = functions.https.onCall( async (data, conte
 
   if (userId && routineId && taskId && stepNumberReq) {
     const task = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks').doc(taskId);
-    
+
     //Using a promise here since 'onCall' is async.
     return task.get()
       .then(doc => {
         if (!doc.exists) {
           console.log('No such document!');
           return 404;
-        } 
+        }
         else {
           stepNumber = parseInt(stepNumberReq)
           const steps = doc.data()!;
@@ -578,7 +578,7 @@ exports.CompleteInstructionOrStep = functions.https.onCall(async (data, context)
     const taskId = data.taskId?.toString();
     const stepNumberReq = data.stepNumber?.toString();
     let stepNumber;
-    
+
     if (userId && routineId && taskId && stepNumberReq) {
         console.log('First test passed...');
         const task = db.collection('users').doc(userId).collection('goals&routines').doc(routineId).collection('actions&tasks').doc(taskId);
@@ -658,7 +658,7 @@ export const CompleteActionOrTask = functions.https.onRequest((request, response
 */
 
 exports.CompleteActionOrTask = functions.https.onCall( async (data, context) => {
-  
+
     //Grab the text parameter.
     const userId = data.userId?.toString();
     const routineId = data.routineId?.toString();
@@ -758,14 +758,14 @@ export const CompleteGoalOrRoutine = functions.https.onRequest((request, respons
 });
 */
 
-exports.CompleteGoalOrRoutine = functions.https.onCall( async (data, context) => { 
- 
+exports.CompleteGoalOrRoutine = functions.https.onCall( async (data, context) => {
+
     //Grab the text parameter.
     const userId = data.userId?.toString();
     const routineId = data.routineId?.toString();
     const routineNumberReq = data.routineNumber?.toString();
     let routineNumber;
-    
+
     if (userId && routineId && routineNumberReq) {
         const user = db.collection('users').doc(userId);
 
@@ -1055,8 +1055,8 @@ export const ResetGratisStatus = functions.https.onRequest(async (req, res) => {
         }) => {
           gr['is_in_progress'] = false
           gr['is_complete'] = false
-          gr['datetime_completed'] = ""
-          gr['datetime_started'] = ""
+          gr['datetime_completed'] = "Thu, 09 Jul 2020 00:00:00 GMT";
+          gr['datetime_started'] = "Thu, 09 Jul 2020 00:00:00 GMT";
           delete gr['is_set'];
           Object.keys(gr['ta_notifications'])
           .forEach( (k: string) => {
@@ -1394,24 +1394,16 @@ exports.UpdateGRIsDisplayed = functions.https.onRequest((req, res) => {
               if (repeatEnds == "On") {
               } else if (repeatEnds == "After") {
                 if (repeatFrequency == "DAY") {
-                  repeatEndsOn = new Date(new Date(startDate).toLocaleString('en-US', {
-                    timeZone: "America/Los_Angeles"
-                  }));
+                  repeatEndsOn = new Date(startDate);
                   repeatEndsOn.setDate(startDate.getDate() + (repeatOccurences-1)*repeatEvery);
                 } else if (repeatFrequency == "WEEK"){
-                  repeatEndsOn = new Date(new Date(startDate).toLocaleString('en-US', {
-                    timeZone: "America/Los_Angeles"
-                  }));
+                  repeatEndsOn = new Date(startDate);
                   repeatEndsOn.setDate(startDate.getDate() + (repeatOccurences-1)*7*repeatEvery);
                 } else if (repeatFrequency == "MONTH"){
-                  repeatEndsOn = new Date(new Date(startDate).toLocaleString('en-US', {
-                    timeZone: "America/Los_Angeles"
-                  }));
+                  repeatEndsOn = new Date(startDate);
                   repeatEndsOn.setMonth(startDate.getMonth() + (repeatOccurences-1)*repeatEvery);
                 } else if (repeatFrequency == "YEAR"){
-                  repeatEndsOn = new Date(new Date(startDate).toLocaleString('en-US', {
-                    timeZone: "America/Los_Angeles"
-                  }));
+                  repeatEndsOn = new Date(startDate);
                   repeatEndsOn.setFullYear(startDate.getFullYear() + (repeatOccurences-1)*repeatEvery);
                 }
               } else if (repeatEnds == "Never") {
