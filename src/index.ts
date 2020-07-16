@@ -1285,7 +1285,9 @@ exports.FindUserDoc = functions.https.onCall(async (data, context) => {
 });
 
 exports.LogGRHistory = functions.https.onRequest((req, res) => {
-  var date = new Date();
+  var date = new Date(new Date().toLocaleString('en-US', {
+		timeZone: "America/Los_Angeles"
+	}));
   // log for previous day
   date.setDate(date.getDate()-1);
   let date_string = (((date.getMonth() > 8) ? (date.getMonth() + 1) : ('0' + (date.getMonth() + 1))) + '/' + ((date.getDate() > 9) ? date.getDate() : ('0' + date.getDate())) + '/' + date.getFullYear());
@@ -1296,8 +1298,8 @@ exports.LogGRHistory = functions.https.onRequest((req, res) => {
     snapshot.forEach(doc => {
       var data = doc.data()['goals&routines']
       if (data != null) {
-        let usr: {"goals&routines": {id: string, title: string, is_complete: string}[], user_id: string} =
-        {"goals&routines": [], user_id: doc.id}
+        let usr: {"email_id": string, "goals&routines": {id: string, title: string, is_complete: string}[], user_id: string} =
+        {"email_id": doc.data().email_id, "goals&routines": [], user_id: doc.id}
         data.forEach((gr: {id: string, title: string, is_complete: string}) => {
           usr["goals&routines"].push(
             {
@@ -1311,31 +1313,19 @@ exports.LogGRHistory = functions.https.onRequest((req, res) => {
       }
     });
     users.forEach( usr => {
-      db.collection("history").where("user_id", "==", usr.user_id).get()
-      .then(snapshot => {
-        let docRef;
-        if (snapshot.empty) {
-          docRef = db.collection("history").doc();
-          docRef.set({
-            user_id:             usr.user_id,
-          });
-        } else {
-          snapshot.forEach(doc => {
-            docRef = db.collection("history").doc(doc.id)
-          });
-        }
-        if (docRef == null) {
-          res.redirect(500, 'failed to generate new doc');
-        } else {
-          let logRef = docRef.collection("goals&routines").doc();
-          logRef.set(
-            {
-              date: date_string,
-              log: usr["goals&routines"]
-            }
-          )
-        }
-      });
+      let docRef = db.collection("history").doc(usr.user_id);
+			let logRef = docRef.collection("goals&routines").doc();
+			docRef.set(
+				{
+					email_id: usr.email_id
+				}
+			)
+			logRef.set(
+				{
+					date: date_string,
+					log: usr["goals&routines"]
+				}
+			)
     });
     res.redirect(303, 'success');
   });
