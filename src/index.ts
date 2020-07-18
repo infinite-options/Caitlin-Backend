@@ -1437,6 +1437,117 @@ exports.UpdateGRIsDisplayed = functions.https.onRequest((req, res) => {
   });
 });
 
+exports.NotificationScheduler = functions.https.onCall(async (data, context) => {
+   
+  const userId = data.userId;
+ 
+  //var arr = [];
+  //var notificationPayload = {};
+
+  interface notificationPayload { [index: string]: { message: string, time: string, title: string } };  
+  var notificationPayload = {} as notificationPayload; 
+
+  /*var notificationPayload = {
+    after: {message: "", time: "", title: ""},
+    before: {message: "", time: string, title: string},
+    during: {message: string, time: string, title: string}
+  };*/
+
+  /*
+  after: {message: string, time: string, title: string},
+     before: {message: string, time: string, title: string},
+     during: {message: string, time: string, title: string}
+  */
+
+  return db.collection('users').doc(userId).get()
+      .then(doc => {
+          if (doc.data()!["goals&routines"] != null) {
+              let arrs = doc.data()!["goals&routines"];
+              arrs.forEach((gr: {
+                start_day_and_time: string,
+                end_day_and_time: string,
+                is_displayed_today: boolean,
+                is_complete: boolean,
+                title: string,
+                user_notifications: {[index: string]: {is_enabled: boolean, is_set: boolean, message: string, time: string}}
+                
+              }) => {
+                  if( gr['is_displayed_today'] && !gr['is_complete']){
+                      console.log("Starting now...");
+
+                      let currentDate = new Date(new Date().toLocaleString('en-US', {
+                          timeZone: "America/Los_Angeles"
+                      }));
+                      let startDate = new Date(new Date(gr["start_day_and_time"]).toLocaleString('en-US', {
+                          timeZone: "America/Los_Angeles"
+                      }));
+                      let endDate = new Date(new Date(gr["end_day_and_time"]).toLocaleString('en-US', {
+                          timeZone: "America/Los_Angeles"
+                      }));
+
+                      console.log('currentdate. '+currentDate);
+                      console.log('startdate. ' + startDate);
+
+                      Object.keys(gr['user_notifications'])
+                          .forEach((k) => {
+                          let notifDate = new Date();
+                          if (k == 'after' && gr['user_notifications'][k]['is_enabled']) {
+                            
+                            console.log('after');
+                            let notifTime = gr['user_notifications'][k]['time'].split(":");
+                            notifDate = endDate;
+                            notifDate.setDate(currentDate.getDate());
+                            notifDate.setHours(endDate.getHours() + Number(notifTime[0]));
+                            notifDate.setMinutes(endDate.getMinutes() + Number(notifTime[1]));
+                            notifDate.setSeconds(endDate.getSeconds() + Number(notifTime[2]));
+                            //notificationPayload.after = {time: notifDate.toLocaleString('en-US'), message: "after", title: "titl"};
+                          }
+                          else if (k == 'before' && gr['user_notifications'][k]['is_enabled']) {
+
+                            console.log("Before:");
+                            let notifTime = gr['user_notifications'][k]['time'].split(":");
+                            notifDate = startDate;
+                            notifDate.setDate(currentDate.getDate());
+                            notifDate.setHours(startDate.getHours() - Number(notifTime[0]));
+                            notifDate.setMinutes(startDate.getMinutes() - Number(notifTime[1]));
+                            notifDate.setSeconds(startDate.getSeconds() - Number(notifTime[2]));
+                            //notificationPayload.before = {time: notifDate.toLocaleString('en-US'), message: "before", title: "titl"};
+                          }
+                          else if (k == 'during' && gr['user_notifications'][k]['is_enabled']) {
+                            
+                            console.log("During:");
+                            let notifTime = gr['user_notifications'][k]['time'].split(":");
+                            notifDate = startDate;
+                            notifDate.setDate(currentDate.getDate());
+                            notifDate.setHours(startDate.getHours() + Number(notifTime[0]));
+                            notifDate.setMinutes(startDate.getMinutes() + Number(notifTime[1]));
+                            notifDate.setSeconds(startDate.getSeconds() + Number(notifTime[2]));
+                            //notificationPayload.during = {time: notifDate.toLocaleString('en-US'), message: "during", title: "titl"};
+                          }
+
+                          //notificationPayload.push = notifDate?.toLocaleString('en-US');
+                          notificationPayload[k] = {time: notifDate.toLocaleString('en-US'), message: gr['user_notifications'][k]['message'], title: gr["title"]};
+
+
+                          
+                      });
+                      console.log(notificationPayload);
+                      //console.log('Start:' + gr['start_day_and_time']);
+                      //console.log('End:' + gr['end_day_and_time']);
+                  }
+              });
+              return 200;
+              //db.collection("users")
+              //.doc(doc.id)
+              //.update({ "goals&routines": arrs });
+          }
+          else{
+            return 404;
+          }
+      });
+      //res.redirect(303, 'success');
+});
+
 function getCurrentDateTimeUTC() {
   const today = new Date()
   return today.toUTCString()
