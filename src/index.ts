@@ -1547,19 +1547,26 @@ export const SaveDeviceToken = functions.https.onRequest((req, res) =>{
   const deviceToken = req.body.deviceToken.toString();
 
   const user = db.collection('users').doc(userId);
+
   user.get()
   .then( doc => {
     if (!doc.exists) {
       console.log('No such document!');
+      res.status(500).send("Unable to find document")
     }
     else{
       const userInfo = doc.data()!;
       userInfo.device_token = deviceToken;
       user.set(userInfo).then().catch();
+      res.status(200).send("Succesfully inserted");
     }
     return userId;
-  });
-  res.redirect(303, 'Success');
+  })
+  .catch(error =>{
+    console.log(error)
+    res.status(500).send("Some problem occurred. Try again.")
+  })
+  
 });
 
 function getCurrentDateTimeUTC() {
