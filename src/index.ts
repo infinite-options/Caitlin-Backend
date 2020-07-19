@@ -331,6 +331,7 @@ exports.StartGoalOrRoutine = functions.https.onCall(async (data, context) => {
                     // console.log('Document data:', doc.data());
                     if (routines['goals&routines'].length>routineNumber && routines['goals&routines'][routineNumber].id === routineId) {
                         routines['goals&routines'][routineNumber].is_in_progress = true;
+                        routines['goals&routines'][routineNumber].is_complete = false;
                         routines['goals&routines'][routineNumber].datetime_started = getCurrentDateTimeUTC();
                         user.set(routines).then().catch();
                         console.log('Success');
@@ -430,6 +431,7 @@ exports.StartActionOrTask = functions.https.onCall( async (data, context) => {
                     const tasks = doc.data()!;
                     if (tasks['actions&tasks'].length>taskNumber && tasks['actions&tasks'][taskNumber].id === taskId) {
                         tasks['actions&tasks'][taskNumber].is_in_progress = true;
+                        tasks['actions&tasks'][taskNumber].is_complete = false;
                         tasks['actions&tasks'][taskNumber].datetime_started = getCurrentDateTimeUTC();
                         routine.set(tasks).then().catch();
                         console.log('Success');
@@ -518,6 +520,7 @@ export const StartInstructionOrStep = functions.https.onCall( async (data, conte
           stepNumber = parseInt(stepNumberReq)
           const steps = doc.data()!;
           steps['instructions&steps'][stepNumber].is_in_progress = true;
+          steps['instructions&steps'][stepNumber].is_complete = false;
           steps['instructions&steps'][stepNumber].datetime_started = getCurrentDateTimeUTC()
           task.set(steps).then().catch();
           console.log('Success');
