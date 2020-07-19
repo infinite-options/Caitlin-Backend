@@ -1434,7 +1434,7 @@ exports.NotificationScheduler = functions.https.onCall(async (data, context) => 
   //var arr = [];
   //var notificationPayload = {};
 
-  interface notificationPayload { [index: string]: { message: string, time: string, title: string } };  
+  interface notificationPayload { "message" : {[index: string]: { message: string, time: string, title: string }}};  
   var notificationPayload = {} as notificationPayload; 
 
   /*var notificationPayload = {
@@ -1516,7 +1516,7 @@ exports.NotificationScheduler = functions.https.onCall(async (data, context) => 
                           }
 
                           //notificationPayload.push = notifDate?.toLocaleString('en-US');
-                          notificationPayload[k] = {time: notifDate.toLocaleString('en-US'), message: gr['user_notifications'][k]['message'], title: gr["title"]};
+                          notificationPayload.message[k] = {time: notifDate.toLocaleString('en-US'), message: gr['user_notifications'][k]['message'], title: gr["title"]};
 
 
                           
