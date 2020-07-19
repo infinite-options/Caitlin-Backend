@@ -1429,7 +1429,7 @@ exports.UpdateGRIsDisplayed = functions.https.onRequest((req, res) => {
     res.redirect(303, 'success');
   });
 });
-
+/*
 exports.NotificationScheduler = functions.https.onCall(async (data, context) => {
    
   const userId = data.userId;
@@ -1451,7 +1451,7 @@ exports.NotificationScheduler = functions.https.onCall(async (data, context) => 
      before: {message: string, time: string, title: string},
      during: {message: string, time: string, title: string}
   */
-
+/*
   return db.collection('users').doc(userId).get()
       .then(doc => {
           if (doc.data()!["goals&routines"] != null) {
@@ -1539,6 +1539,27 @@ exports.NotificationScheduler = functions.https.onCall(async (data, context) => 
           }
       });
       //res.redirect(303, 'success');
+});
+*/
+
+export const SaveDeviceToken = functions.https.onRequest((req, res) =>{
+  const userId = req.body.userId.toString();
+  const deviceToken = req.body.deviceToken.toString();
+
+  const user = db.collection('users').doc(userId);
+  user.get()
+  .then( doc => {
+    if (!doc.exists) {
+      console.log('No such document!');
+    }
+    else{
+      const userInfo = doc.data()!;
+      userInfo.device_token = deviceToken;
+      user.set(userInfo).then().catch();
+    }
+    return userId;
+  });
+  res.redirect(303, 'Success');
 });
 
 function getCurrentDateTimeUTC() {
