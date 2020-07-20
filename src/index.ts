@@ -1553,20 +1553,24 @@ export const SaveDeviceToken = functions.https.onRequest((req, res) =>{
     if (!doc.exists) {
       console.log('No such document!');
       res.status(500).send("Unable to find document")
-    }
-    else{
+  }
+  else{
       const userInfo = doc.data()!;
-      userInfo.device_token = deviceToken;
+      console.log(typeof userInfo);
+      if(!userInfo['device_token']){
+          userInfo.device_token = [];
+          console.log("Creating device_token array");
+      }
+      console.log("Pushing into device_token array");
+      userInfo['device_token'].push(deviceToken);
       user.set(userInfo).then().catch();
       res.status(200).send("Succesfully inserted");
-    }
-    return userId;
+  }
   })
   .catch(error =>{
     console.log(error)
     res.status(500).send("Some problem occurred. Try again.")
   })
-  
 });
 
 function getCurrentDateTimeUTC() {
