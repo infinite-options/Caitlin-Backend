@@ -1559,9 +1559,9 @@ export const SaveDeviceToken = functions.https.onRequest((req, res) =>{
       console.log(typeof userInfo);
       if(!userInfo['device_token']){
           userInfo.device_token = [];
-          //console.log("Creating device_token array");
+          console.log("Creating device_token array");
       }
-      //console.log("Pushing into device_token array");
+      console.log("Pushing into device_token array");
       userInfo['device_token'].push(deviceToken);
       user.set(userInfo).then().catch();
       res.status(200).send("Succesfully inserted");
