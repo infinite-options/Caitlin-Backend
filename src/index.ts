@@ -331,7 +331,6 @@ exports.StartGoalOrRoutine = functions.https.onCall(async (data, context) => {
                     // console.log('Document data:', doc.data());
                     if (routines['goals&routines'].length>routineNumber && routines['goals&routines'][routineNumber].id === routineId) {
                         routines['goals&routines'][routineNumber].is_in_progress = true;
-                        routines['goals&routines'][routineNumber].is_complete = false;
                         routines['goals&routines'][routineNumber].datetime_started = getCurrentDateTimeUTC();
                         user.set(routines).then().catch();
                         console.log('Success');
@@ -431,7 +430,6 @@ exports.StartActionOrTask = functions.https.onCall( async (data, context) => {
                     const tasks = doc.data()!;
                     if (tasks['actions&tasks'].length>taskNumber && tasks['actions&tasks'][taskNumber].id === taskId) {
                         tasks['actions&tasks'][taskNumber].is_in_progress = true;
-                        tasks['actions&tasks'][taskNumber].is_complete = false;
                         tasks['actions&tasks'][taskNumber].datetime_started = getCurrentDateTimeUTC();
                         routine.set(tasks).then().catch();
                         console.log('Success');
@@ -520,7 +518,6 @@ export const StartInstructionOrStep = functions.https.onCall( async (data, conte
           stepNumber = parseInt(stepNumberReq)
           const steps = doc.data()!;
           steps['instructions&steps'][stepNumber].is_in_progress = true;
-          steps['instructions&steps'][stepNumber].is_complete = false;
           steps['instructions&steps'][stepNumber].datetime_started = getCurrentDateTimeUTC()
           task.set(steps).then().catch();
           console.log('Success');
@@ -1073,11 +1070,30 @@ export const ResetGratisStatus = functions.https.onRequest(async (req, res) => {
         db.collection("users")
         .doc(doc.id)
         .update({ "goals&routines": arrs });
+
+        db.collection("users")
+        .doc(doc.id)
+        .collection("goals&routines").get()
+        .then((snapshot) => {
+          if (!snapshot.empty) {
+            snapshot.forEach((at_doc) => {
+              let at = at_doc.data();
+              at.completed = false
+              at.is_in_progress = false
+              db.collection("users")
+              .doc(doc.id)
+              .collection("goals&routines")
+              .doc(at_doc.id)
+              .update(at);
+            });
+          }
+        });
       }
     });
     res.redirect(303, 'success');
   });
 });
+
 
 export const CopyDocDataToChild = functions.https.onRequest((request, response) => {
   // Grab the text parameter.
@@ -1293,7 +1309,7 @@ exports.LogGRHistory = functions.https.onRequest((req, res) => {
 	}));
   // log for previous day
   date.setDate(date.getDate()-1);
-  let date_string = (((date.getMonth() > 8) ? (date.getMonth() + 1) : ('0' + (date.getMonth() + 1))) + '/' + ((date.getDate() > 9) ? date.getDate() : ('0' + date.getDate())) + '/' + date.getFullYear());
+  let date_string = date.getFullYear() + "_" + ((date.getMonth() > 8) ? (date.getMonth() + 1) : ('0' + (date.getMonth() + 1))) + '_' + ((date.getDate() > 9) ? date.getDate() : ('0' + date.getDate()));
   let users: any[] = []
   db.collection("users").get()
   .then((snapshot) =>
@@ -1301,14 +1317,15 @@ exports.LogGRHistory = functions.https.onRequest((req, res) => {
     snapshot.forEach(doc => {
       var data = doc.data()['goals&routines']
       if (data != null) {
-        let usr: {"email_id": string, "goals&routines": {id: string, title: string, is_complete: string}[], user_id: string} =
+        let usr: {"email_id": string, "goals&routines": {id: string, title: string, is_complete: string, is_in_progress: string}[], user_id: string} =
         {"email_id": doc.data().email_id, "goals&routines": [], user_id: doc.id}
-        data.forEach((gr: {id: string, title: string, is_complete: string}) => {
+        data.forEach((gr: {id: string, title: string, is_complete: string, is_in_progress: string}) => {
           usr["goals&routines"].push(
             {
               id: gr['id'],
               title: gr['title'],
-              is_complete: gr['is_complete']
+              is_complete: gr['is_complete'],
+              is_in_progress: gr['is_in_progress']
             }
           )
         });
@@ -1317,7 +1334,7 @@ exports.LogGRHistory = functions.https.onRequest((req, res) => {
     });
     users.forEach( usr => {
       let docRef = db.collection("history").doc(usr.user_id);
-			let logRef = docRef.collection("goals&routines").doc();
+			let logRef = docRef.collection("goals&routines").doc(date_string);
 			docRef.set(
 				{
 					email_id: usr.email_id
@@ -1339,7 +1356,22 @@ exports.UpdateGRIsDisplayed = functions.https.onRequest((req, res) => {
     timeZone: "America/Los_Angeles"
   }));
   CurrentDate.setHours(0,0,0,0);
-
+  let grs:{
+    userId: string,
+    title: string,
+    repeat: boolean,
+    startDate: string,
+    startDateCalculated: Date,
+    repeatOccurences: number,
+    repeatEndsOn: string,
+    repeatEndsOnCalculated: Date,
+    currentDateRaw: Date,
+    currentDatePDT: Date,
+    currentDate: Date,
+    repeatWeekDays: number[],
+    isDisplayedToday: boolean,
+    isDisplayedTodayCalculated: boolean
+  }[] = []
   db.collection("users").get()
   .then((snapshot) =>
   {
@@ -1347,6 +1379,7 @@ exports.UpdateGRIsDisplayed = functions.https.onRequest((req, res) => {
       if (doc.data()["goals&routines"] != null) {
         let arrs = doc.data()["goals&routines"];
         arrs.forEach((gr: {
+          title: string,
           start_day_and_time: string,
           repeat_occurences: string,
           is_displayed_today: boolean,
@@ -1419,6 +1452,24 @@ exports.UpdateGRIsDisplayed = functions.https.onRequest((req, res) => {
               }
             }
           }
+          grs.push({
+						userId: doc.id,
+						title: gr.title,
+						repeat: gr.repeat,
+						startDate: gr["start_day_and_time"],
+            startDateCalculated: startDate,
+						repeatOccurences: repeatOccurences,
+						repeatEndsOn: gr["repeat_ends"],
+            repeatEndsOnCalculated: repeatEndsOn,
+            currentDateRaw: new Date(),
+            currentDatePDT: new Date(new Date().toLocaleString('en-US', {
+              timeZone: "America/Los_Angeles"
+            })),
+						currentDate: CurrentDate,
+						repeatWeekDays: repeatWeekDays,
+						isDisplayedToday: gr["is_displayed_today"],
+						isDisplayedTodayCalculated: isDisplayedTodayCalculated
+					})
           gr["is_displayed_today"] = isDisplayedTodayCalculated
         });
         db.collection("users")
@@ -1426,151 +1477,8 @@ exports.UpdateGRIsDisplayed = functions.https.onRequest((req, res) => {
         .update({ "goals&routines": arrs });
       }
     });
-    res.redirect(303, 'success');
+    res.json(grs);
   });
-});
-/*
-exports.NotificationScheduler = functions.https.onCall(async (data, context) => {
-   
-  const userId = data.userId;
- 
-  //var arr = [];
-  //var notificationPayload = {};
-
-  interface notificationPayload { "message" : {[index: string]: { message: string, time: string, title: string }}};  
-  var notificationPayload = {} as notificationPayload; 
-
-  /*var notificationPayload = {
-    after: {message: "", time: "", title: ""},
-    before: {message: "", time: string, title: string},
-    during: {message: string, time: string, title: string}
-  };*/
-
-  /*
-  after: {message: string, time: string, title: string},
-     before: {message: string, time: string, title: string},
-     during: {message: string, time: string, title: string}
-  */
-/*
-  return db.collection('users').doc(userId).get()
-      .then(doc => {
-          if (doc.data()!["goals&routines"] != null) {
-              let arrs = doc.data()!["goals&routines"];
-              arrs.forEach((gr: {
-                start_day_and_time: string,
-                end_day_and_time: string,
-                is_displayed_today: boolean,
-                is_complete: boolean,
-                title: string,
-                user_notifications: {[index: string]: {is_enabled: boolean, is_set: boolean, message: string, time: string}}
-                
-              }) => {
-                  if( gr['is_displayed_today'] && !gr['is_complete']){
-                      console.log("Starting now...");
-
-                      let currentDate = new Date(new Date().toLocaleString('en-US', {
-                          timeZone: "America/Los_Angeles"
-                      }));
-                      let startDate = new Date(new Date(gr["start_day_and_time"]).toLocaleString('en-US', {
-                          timeZone: "America/Los_Angeles"
-                      }));
-                      let endDate = new Date(new Date(gr["end_day_and_time"]).toLocaleString('en-US', {
-                          timeZone: "America/Los_Angeles"
-                      }));
-
-                      console.log('currentdate. '+currentDate);
-                      console.log('startdate. ' + startDate);
-
-                      Object.keys(gr['user_notifications'])
-                          .forEach((k) => {
-                          let notifDate = new Date();
-                          if (k == 'after' && gr['user_notifications'][k]['is_enabled']) {
-                            
-                            console.log('after');
-                            let notifTime = gr['user_notifications'][k]['time'].split(":");
-                            notifDate = endDate;
-                            notifDate.setDate(currentDate.getDate());
-                            notifDate.setHours(endDate.getHours() + Number(notifTime[0]));
-                            notifDate.setMinutes(endDate.getMinutes() + Number(notifTime[1]));
-                            notifDate.setSeconds(endDate.getSeconds() + Number(notifTime[2]));
-                            //notificationPayload.after = {time: notifDate.toLocaleString('en-US'), message: "after", title: "titl"};
-                          }
-                          else if (k == 'before' && gr['user_notifications'][k]['is_enabled']) {
-
-                            console.log("Before:");
-                            let notifTime = gr['user_notifications'][k]['time'].split(":");
-                            notifDate = startDate;
-                            notifDate.setDate(currentDate.getDate());
-                            notifDate.setHours(startDate.getHours() - Number(notifTime[0]));
-                            notifDate.setMinutes(startDate.getMinutes() - Number(notifTime[1]));
-                            notifDate.setSeconds(startDate.getSeconds() - Number(notifTime[2]));
-                            //notificationPayload.before = {time: notifDate.toLocaleString('en-US'), message: "before", title: "titl"};
-                          }
-                          else if (k == 'during' && gr['user_notifications'][k]['is_enabled']) {
-                            
-                            console.log("During:");
-                            let notifTime = gr['user_notifications'][k]['time'].split(":");
-                            notifDate = startDate;
-                            notifDate.setDate(currentDate.getDate());
-                            notifDate.setHours(startDate.getHours() + Number(notifTime[0]));
-                            notifDate.setMinutes(startDate.getMinutes() + Number(notifTime[1]));
-                            notifDate.setSeconds(startDate.getSeconds() + Number(notifTime[2]));
-                            //notificationPayload.during = {time: notifDate.toLocaleString('en-US'), message: "during", title: "titl"};
-                          }
-
-                          //notificationPayload.push = notifDate?.toLocaleString('en-US');
-                          notificationPayload.message[k] = {time: notifDate.toLocaleString('en-US'), message: gr['user_notifications'][k]['message'], title: gr["title"]};
-
-
-                          
-                      });
-                      console.log(notificationPayload);
-                      //console.log('Start:' + gr['start_day_and_time']);
-                      //console.log('End:' + gr['end_day_and_time']);
-                  }
-              });
-              return 200;
-              //db.collection("users")
-              //.doc(doc.id)
-              //.update({ "goals&routines": arrs });
-          }
-          else{
-            return 404;
-          }
-      });
-      //res.redirect(303, 'success');
-});
-*/
-
-export const SaveDeviceToken = functions.https.onRequest((req, res) =>{
-  const userId = req.body.userId.toString();
-  const deviceToken = req.body.deviceToken.toString();
-
-  const user = db.collection('users').doc(userId);
-
-  user.get()
-  .then( doc => {
-    if (!doc.exists) {
-      console.log('No such document!');
-      res.status(500).send("Unable to find document")
-  }
-  else{
-      const userInfo = doc.data()!;
-      console.log(typeof userInfo);
-      if(!userInfo['device_token']){
-          userInfo.device_token = [];
-          console.log("Creating device_token array");
-      }
-      console.log("Pushing into device_token array");
-      userInfo['device_token'].push(deviceToken);
-      user.set(userInfo).then().catch();
-      res.status(200).send("Succesfully inserted");
-  }
-  })
-  .catch(error =>{
-    console.log(error)
-    res.status(500).send("Some problem occurred. Try again.")
-  })
 });
 
 function getCurrentDateTimeUTC() {
