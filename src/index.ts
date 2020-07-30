@@ -319,7 +319,7 @@ exports.StartGoalOrRoutine = functions.https.onCall(async (data, context) => {
     //Grab the text parameter.
     const userId = data.userId?.toString();
     const routineId = data.routineId?.toString();
-    const routineNumberReq = data.taskNumber?.toString();
+    const routineNumberReq = data.routineNumber?.toString();
     let routineNumber;
 
     if (userId && routineId && routineNumberReq) {
