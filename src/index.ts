@@ -5,6 +5,13 @@ const firebase_tools = require('firebase-tools');
 //const serviceAccount = require('../ServiceAccount.json');
 //const serviceAccount = require('../ServiceAccountMyLife.json');
 const serviceAccount = require('../ServiceAccountKey.json');
+
+const fs = require( 'fs' );
+const {google} = require('googleapis');
+const OAuth2Client = google.auth.OAuth2
+var credentials_url = 'credentials.json';
+const redirect_uri = "https://developers.google.com/oauthplayground";
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
@@ -1562,6 +1569,13 @@ export const SaveDeviceToken = functions.https.onRequest((req, res) =>{
           console.log("Creating device_token array");
       }
       console.log("Pushing into device_token array");
+      //console.log(typeof userInfo['device_token']);
+      userInfo['device_token'].forEach( (token: String)=>{
+        if (token === deviceToken) {
+          console.log("Token already exists. Exiting");
+          res.status(200).send("Token already exists.");
+        }
+      });
       userInfo['device_token'].push(deviceToken);
       user.set(userInfo).then().catch();
       res.status(200).send("Succesfully inserted");
@@ -1572,6 +1586,89 @@ export const SaveDeviceToken = functions.https.onRequest((req, res) =>{
     res.status(500).send("Some problem occurred. Try again.")
   })
 });
+
+export const GetEventsForTheDay = functions.https.onRequest((req, res) => {
+
+  const id = req.body.id.toString();
+  let startParam = req.body.start.toString();
+  let endParam = req.body.end.toString();
+
+  console.log( 'start : ', startParam, ' end:', endParam );
+
+  setUpAuthById( id, ( auth: any ) => {
+      if(auth==500) {
+          res.status(500).send('Failed to find document!');
+      }
+      else {
+          const calendar = google.calendar( { version: 'v3', auth } );
+          calendar.events.list(
+              {
+                  calendarId:   'primary',
+                  timeMin:      startParam,
+                  timeMax:      endParam,
+                  maxResults:   999,
+                  singleEvents: true,
+                  orderBy:      'startTime'
+                  //timeZone: 
+              },
+              (error: any, response: any) => {
+                  //CallBack
+                  if ( error ) {
+                      res.status(500).send( 'The post request returned an error: ' + error );
+                  }
+                  else{
+                      res.status(200).send(response.data.items);
+                  }
+              }
+          );
+      }
+  });
+});
+
+function setUpAuthById( id: string, callback: any ) {
+  console.log("SETUPAUTHBYID");
+  fs.readFile( credentials_url, ( err: any, content: any ) => {
+      if ( err ) {
+          console.log( 'Error loading client secret file:', err );
+          return;
+      }
+      // Authorize a client with credentials, then call the Google Calendar
+      authorizeById( JSON.parse( content ), id, callback ); 
+  });
+}
+
+function authorizeById( credentials: any, id: string, callback: any ) {
+  console.log("AUTHORIZEBYID");
+  const { client_secret, client_id } = credentials.web;
+
+  const oAuth2Client = new OAuth2Client(
+      client_id,
+      client_secret,
+      redirect_uri
+  );
+
+  // Store to firebase
+if ( id ) {
+      db.collection( 'users' ).doc( id ).get()
+      .then((doc) => {
+          if (!doc.exists) {
+              console.log('No such document!');
+              callback(500);
+          }
+          else {
+              const userAuthInfo = doc.data();
+              oAuth2Client.setCredentials( {
+              access_token:  userAuthInfo!.google_auth_token,
+              refresh_token: userAuthInfo!.google_refresh_token
+          });
+          callback(oAuth2Client);
+          }
+      })
+      .catch(error=>{
+          console.log("Error::: ", error);
+      });
+}
+}
 
 function getCurrentDateTimeUTC() {
   const today = new Date()
