@@ -1077,21 +1077,45 @@ export const ResetGratisStatus = functions.https.onRequest(async (req, res) => {
         db.collection("users")
         .doc(doc.id)
         .update({ "goals&routines": arrs });
-
         db.collection("users")
         .doc(doc.id)
         .collection("goals&routines").get()
         .then((snapshot) => {
           if (!snapshot.empty) {
-            snapshot.forEach((at_doc) => {
-              let at = at_doc.data();
-              at.completed = false
-              at.is_in_progress = false
+            snapshot.forEach((gr_doc) => {
+              let gr = gr_doc.data();
+              gr["actions&tasks"].forEach((at:{is_complete: boolean, is_in_progress: boolean}) => {
+                at.is_complete = false
+                at.is_in_progress = false
+                db.collection("users")
+                .doc(doc.id)
+                .collection("goals&routines")
+                .doc(gr_doc.id)
+                .collection("actions&tasks").get()
+                .then(is_snapshot => {
+                  if(!is_snapshot.empty) {
+                    is_snapshot.forEach((is_doc) => {
+                      let is = is_doc.data();
+                      is["instructions&steps"].forEach((x:{is_complete: boolean, is_in_progress: boolean}) => {
+                        x.is_complete = false
+                        x.is_in_progress = false
+                      });
+                      db.collection("users")
+                      .doc(doc.id)
+                      .collection("goals&routines")
+                      .doc(gr_doc.id)
+                      .collection("actions&tasks")
+                      .doc(is_doc.id)
+                      .update(is);
+                    });
+                  }
+                });
+              });
               db.collection("users")
               .doc(doc.id)
               .collection("goals&routines")
-              .doc(at_doc.id)
-              .update(at);
+              .doc(gr_doc.id)
+              .update(gr);
             });
           }
         });
@@ -1490,14 +1514,14 @@ exports.UpdateGRIsDisplayed = functions.https.onRequest((req, res) => {
 
 /*
 exports.NotificationScheduler = functions.https.onCall(async (data, context) => {
-   
+
   const userId = data.userId;
- 
+
   //var arr = [];
   //var notificationPayload = {};
 
-  interface notificationPayload { "message" : {[index: string]: { message: string, time: string, title: string }}};  
-  var notificationPayload = {} as notificationPayload; 
+  interface notificationPayload { "message" : {[index: string]: { message: string, time: string, title: string }}};
+  var notificationPayload = {} as notificationPayload;
 
   /*var notificationPayload = {
     after: {message: "", time: "", title: ""},
@@ -1522,7 +1546,7 @@ exports.NotificationScheduler = functions.https.onCall(async (data, context) => 
                 is_complete: boolean,
                 title: string,
                 user_notifications: {[index: string]: {is_enabled: boolean, is_set: boolean, message: string, time: string}}
-                
+
               }) => {
                   if( gr['is_displayed_today'] && !gr['is_complete']){
                       console.log("Starting now...");
@@ -1544,7 +1568,7 @@ exports.NotificationScheduler = functions.https.onCall(async (data, context) => 
                           .forEach((k) => {
                           let notifDate = new Date();
                           if (k == 'after' && gr['user_notifications'][k]['is_enabled']) {
-                            
+
                             console.log('after');
                             let notifTime = gr['user_notifications'][k]['time'].split(":");
                             notifDate = endDate;
@@ -1566,7 +1590,7 @@ exports.NotificationScheduler = functions.https.onCall(async (data, context) => 
                             //notificationPayload.before = {time: notifDate.toLocaleString('en-US'), message: "before", title: "titl"};
                           }
                           else if (k == 'during' && gr['user_notifications'][k]['is_enabled']) {
-                            
+
                             console.log("During:");
                             let notifTime = gr['user_notifications'][k]['time'].split(":");
                             notifDate = startDate;
@@ -1581,7 +1605,7 @@ exports.NotificationScheduler = functions.https.onCall(async (data, context) => 
                           notificationPayload.message[k] = {time: notifDate.toLocaleString('en-US'), message: gr['user_notifications'][k]['message'], title: gr["title"]};
 
 
-                          
+
                       });
                       console.log(notificationPayload);
                       //console.log('Start:' + gr['start_day_and_time']);
@@ -1661,7 +1685,7 @@ export const GetEventsForTheDay = functions.https.onRequest((req, res) => {
                   maxResults:   999,
                   singleEvents: true,
                   orderBy:      'startTime'
-                  //timeZone: 
+                  //timeZone:
               },
               (error: any, response: any) => {
                   //CallBack
@@ -1685,7 +1709,7 @@ function setUpAuthById( id: string, callback: any ) {
           return;
       }
       // Authorize a client with credentials, then call the Google Calendar
-      authorizeById( JSON.parse( content ), id, callback ); 
+      authorizeById( JSON.parse( content ), id, callback );
   });
 }
 
