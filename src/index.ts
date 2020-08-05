@@ -1062,8 +1062,6 @@ export const ResetGratisStatus = functions.https.onRequest(async (req, res) => {
         }) => {
           gr['is_in_progress'] = false
           gr['is_complete'] = false
-          gr['datetime_completed'] = "Thu, 09 Jul 2020 00:00:00 GMT";
-          gr['datetime_started'] = "Thu, 09 Jul 2020 00:00:00 GMT";
           delete gr['is_set'];
           Object.keys(gr['ta_notifications'])
           .forEach( (k: string) => {
@@ -1121,8 +1119,9 @@ export const ResetGratisStatus = functions.https.onRequest(async (req, res) => {
         });
       }
     });
-    res.redirect(303, 'success');
   });
+  await sleep(10000);
+  res.redirect(303, 'success');
 });
 
 
@@ -1334,10 +1333,10 @@ exports.FindUserDoc = functions.https.onCall(async (data, context) => {
   return userDetails;
 });
 
-exports.LogGRHistory = functions.https.onRequest((req, res) => {
+exports.LogGRHistory = functions.https.onRequest(async (req, res) => {
   var date = new Date(new Date().toLocaleString('en-US', {
-		timeZone: "America/Los_Angeles"
-	}));
+    timeZone: "America/Los_Angeles"
+  }));
   // log for previous day
   date.setDate(date.getDate()-1);
   let date_string = date.getFullYear() + "_" + ((date.getMonth() > 8) ? (date.getMonth() + 1) : ('0' + (date.getMonth() + 1))) + '_' + ((date.getDate() > 9) ? date.getDate() : ('0' + date.getDate()));
@@ -1350,36 +1349,79 @@ exports.LogGRHistory = functions.https.onRequest((req, res) => {
       if (data != null) {
         let usr: {"email_id": string, "goals&routines": {id: string, title: string, is_complete: string, is_in_progress: string}[], user_id: string} =
         {"email_id": doc.data().email_id, "goals&routines": [], user_id: doc.id}
+        let grs:any = []
         data.forEach((gr: {id: string, title: string, is_complete: string, is_in_progress: string}) => {
-          usr["goals&routines"].push(
+          db.collection("users")
+          .doc(doc.id)
+          .collection("goals&routines")
+          .doc(gr.id)
+          .get()
+          .then((gr_collection_snapshot) => {
+            let gr_collection = gr_collection_snapshot.data();
+            let ats: any[] = []
+            let gr_log: any =
             {
               id: gr['id'],
               title: gr['title'],
               is_complete: gr['is_complete'],
               is_in_progress: gr['is_in_progress']
             }
-          )
+            if(gr_collection!= undefined){
+              gr_collection["actions&tasks"].forEach((at:{is_complete: boolean, is_in_progress: boolean}) => {
+                let at_log:any = {
+                  is_complete: at['is_complete'],
+                  is_in_progress: at['is_in_progress']
+                };
+                let iss: {is_complete: boolean, is_in_progress: boolean}[] = []
+                db.collection("users")
+                .doc(doc.id)
+                .collection("goals&routines")
+                .doc(gr.id)
+                .collection("actions&tasks").get()
+                .then(is_snapshot => {
+                  if(!is_snapshot.empty) {
+                    is_snapshot.forEach((is_doc) => {
+                      let is = is_doc.data();
+                      is["instructions&steps"].forEach((x:{is_complete: boolean, is_in_progress: boolean}) => {
+                        iss.push({
+                          is_complete: x.is_complete,
+                          is_in_progress: x.is_in_progress
+                        })
+                      });
+                    });
+                    at_log["instructions&steps"] = iss
+                  }
+                });
+                ats.push(at_log)
+              });
+              gr_log["actions&tasks"] = ats
+              grs.push(gr_log)
+            }
+          });
+          usr["goals&routines"] = grs
         });
         users.push(usr)
       }
     });
-    users.forEach( usr => {
-      let docRef = db.collection("history").doc(usr.user_id);
-			let logRef = docRef.collection("goals&routines").doc(date_string);
-			docRef.set(
-				{
-					email_id: usr.email_id
-				}
-			)
-			logRef.set(
-				{
-					date: date_string,
-					log: usr["goals&routines"]
-				}
-			)
-    });
-    res.redirect(303, 'success');
   });
+  await sleep(10000);
+  users.forEach( usr => {
+    let docRef = db.collection("history").doc(usr.user_id);
+    let logRef = docRef.collection("goals&routines").doc(date_string);
+    docRef.set(
+      {
+        email_id: usr.email_id
+      }
+    )
+    logRef.set(
+      {
+        date: date_string,
+        log: usr["goals&routines"]
+      }
+    )
+  });
+  await sleep(5000);
+  res.redirect(303, 'success');
 });
 
 exports.UpdateGRIsDisplayed = functions.https.onRequest((req, res) => {
@@ -1814,4 +1856,10 @@ function deleteFields(data:any) {
   delete data['remind_types']
   delete data['reminds_user']
   delete data['notifies_ta']
+}
+
+function sleep(ms:number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
